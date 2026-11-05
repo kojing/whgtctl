@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>光学補正・ウェイト調整パネル</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0;background:#1B1C1E}
+a{color:#7DBBFF}a:hover{color:#A9D2FF}
+input[type=range]{width:100%;accent-color:#5AA9FF;margin:0;height:20px}
+input[type=checkbox]{accent-color:#2F7DD1;width:16px;height:16px;margin:0;flex:none}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; background: #1B1C1E; color: #E8E8E8; font-family: 'Noto Sans JP', system-ui, sans-serif; display: flex; flex-wrap: wrap; align-items: stretch">
+
+  <main style="flex: 999 1 560px; min-width: 0; padding: 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+    <header style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #A3A7AD; letter-spacing: 0.08em">STEM-AWARE WEIGHT ENGINE — MOCK</div>
+        <h1 style="margin: 0; font-size: 22px; font-weight: 700">塗りパスのウェイト調整・太さの均一化・縦横比</h1>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 12px">
+        <span style="padding: 6px 10px; border: 1px solid #3A3D42; border-radius: 6px; color: #D4D6D9">検出 StdVW {{rd.med}}u</span>
+        <span style="padding: 6px 10px; border: 1px solid #3A3D42; border-radius: 6px; color: #D4D6D9">縦画 {{rd.v}}u</span>
+        <span style="padding: 6px 10px; border: 1px solid #3A3D42; border-radius: 6px; color: #D4D6D9">横画 {{rd.h}}u</span>
+        <span style="padding: 6px 10px; border: 1px solid #3A3D42; border-radius: 6px; color: #D4D6D9">字幅 {{rd.adv}}u</span>
+        <span style="padding: 6px 10px; border: 1px solid #5AA9FF; border-radius: 6px; color: #A9D2FF">アンカー {{rd.ancIn}} → {{rd.anc}}</span>
+      </div>
+    </header>
+
+    <section style="background: #F3F1EC; border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; color: #4A4D52; font-size: 12px; font-family: 'IBM Plex Mono', monospace">
+        <span>SPECIMEN — LATIN / かな</span>
+        <span>破線 = 元の塗り</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: center">
+        <svg viewBox="{{sp.vb}}" style="width: 100%; height: auto; display: block" role="img" aria-label="補正後の欧文見本">
+          <line x1="0" x2="{{sp.w}}" y1="{{sp.t}}" y2="{{sp.t}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sp.w}}" y1="{{sp.b}}" y2="{{sp.b}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sp.w}}" y1="{{sp.ot}}" y2="{{sp.ot}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sp.w}}" y1="{{sp.ob}}" y2="{{sp.ob}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+          <path d="{{sp.d}}" style="fill: #141414; fill-rule: nonzero"></path>
+          <path d="{{sp.d0}}" style="fill: none; stroke: #D9480F; stroke-width: 3; stroke-dasharray: 10 7; opacity: {{ghostOp}}"></path>
+        </svg>
+        <svg viewBox="{{sk.vb}}" style="width: 100%; height: auto; display: block" role="img" aria-label="補正後のひらがな見本">
+          <line x1="0" x2="{{sk.w}}" y1="{{sk.t}}" y2="{{sk.t}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sk.w}}" y1="{{sk.b}}" y2="{{sk.b}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sk.w}}" y1="{{sk.ot}}" y2="{{sk.ot}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+          <line x1="0" x2="{{sk.w}}" y1="{{sk.ob}}" y2="{{sk.ob}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+          <path d="{{sk.d}}" style="fill: #141414; fill-rule: nonzero"></path>
+          <path d="{{sk.d0}}" style="fill: none; stroke: #D9480F; stroke-width: 3; stroke-dasharray: 10 7; opacity: {{ghostOp}}"></path>
+        </svg>
+      </div>
+    </section>
+
+    <section style="background: #F3F1EC; border-radius: 10px; padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; color: #141414">
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px">
+        <span style="color: #4A4D52; font-size: 12px; font-family: 'IBM Plex Mono', monospace">ANALYSIS — 元の塗り（解析）/ 補正後</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center" role="group" aria-label="グリフ選択">
+          <sc-for list="{{latinPills}}" as="g" hint-placeholder-count="7">
+            <button type="button" onClick="{{g.pick}}" aria-pressed="{{g.on}}" style="{{g.style}}">{{g.ch}}</button>
+          </sc-for>
+          <span style="width: 1px; height: 28px; background: #B9B6AE; margin: 0 6px" aria-hidden="true"></span>
+          <sc-for list="{{kanaPills}}" as="g" hint-placeholder-count="6">
+            <button type="button" onClick="{{g.pick}}" aria-pressed="{{g.on}}" style="{{g.style}}">{{g.ch}}</button>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <div style="position: relative; flex: 2 1 480px; min-width: 0">
+          <svg viewBox="{{zm.vb}}" style="width: 100%; height: auto; display: block" role="img" aria-label="選択グリフの解析結果と補正後の比較">
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.ot}}" y2="{{zm.ot}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.t}}" y2="{{zm.t}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.oc}}" y2="{{zm.oc}}" style="stroke: #C2410C; stroke-width: 2; stroke-dasharray: 4 6; opacity: {{gOp}}"></line>
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.mid}}" y2="{{zm.mid}}" style="stroke: #6B7280; stroke-width: 2; opacity: {{gOp}}"></line>
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.b}}" y2="{{zm.b}}" style="stroke: #2F7DD1; stroke-width: 2; opacity: {{gOp}}"></line>
+            <line x1="0" x2="{{zm.lx}}" y1="{{zm.ob}}" y2="{{zm.ob}}" style="stroke: #2F7DD1; stroke-width: 2; stroke-dasharray: 6 8; opacity: {{gOp}}"></line>
+            <text x="{{zm.tx}}" y="{{zm.ott}}" style="font-size: 22px; fill: #1F5FA8; opacity: {{gOp}}">オーバーシュート</text>
+            <text x="{{zm.tx}}" y="{{zm.tt}}" style="font-size: 22px; fill: #1F5FA8; opacity: {{gOp}}">{{zm.lTop}}</text>
+            <text x="{{zm.tx}}" y="{{zm.oct}}" style="font-size: 22px; fill: #9A3412; opacity: {{gOp}}">光学的中心</text>
+            <text x="{{zm.tx}}" y="{{zm.midt}}" style="font-size: 22px; fill: #4B5563; opacity: {{gOp}}">幾何学的中心</text>
+            <text x="{{zm.tx}}" y="{{zm.bt}}" style="font-size: 22px; fill: #1F5FA8; opacity: {{gOp}}">{{zm.lBot}}</text>
+            <path d="{{zm.d0}}" style="fill: #DAD6CE"></path>
+            <path d="{{zm.cv}}" style="fill: none; stroke: #1E5FAF; stroke-width: 2; opacity: {{anaOp}}"></path>
+            <path d="{{zm.ch}}" style="fill: none; stroke: #B3400A; stroke-width: 2; opacity: {{anaOp}}"></path>
+            <path d="{{zm.cd}}" style="fill: none; stroke: #6D28D9; stroke-width: 2; opacity: {{anaOp}}"></path>
+            <path d="{{zm.cc}}" style="fill: none; stroke: #0F766E; stroke-width: 2; opacity: {{anaOp}}"></path>
+            <path d="{{zm.d}}" style="fill: #141414"></path>
+            <path d="{{zm.d0b}}" style="fill: none; stroke: #D9480F; stroke-width: 3; stroke-dasharray: 10 7; opacity: {{ghostOp}}"></path>
+            <path d="{{zm.hl}}" style="fill: none; stroke: #5AA9FF; stroke-width: 2; opacity: {{anaOp}}"></path>
+            <path d="{{zm.an}}" style="fill: #FFFFFF; stroke: #1F5FA8; stroke-width: 3; opacity: {{anaOp}}"></path>
+            <text x="{{zm.c0}}" y="{{zm.capY}}" style="font-size: 26px; fill: #4A4D52; text-anchor: middle">元の塗り（解析）</text>
+            <text x="{{zm.c1}}" y="{{zm.capY}}" style="font-size: 26px; fill: #141414; text-anchor: middle; font-weight: 700">補正後（□ = アンカー）</text>
+          </svg>
+          <sc-if value="{{ana}}" hint-placeholder-val="{{ true }}">
+            <div style="position: absolute; inset: 0; pointer-events: none" aria-hidden="true">
+              <sc-for list="{{zl}}" as="lb" hint-placeholder-count="6">
+                <span style="{{lb.style}}">{{lb.t}}</span>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 12px; color: #4A4D52">
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 3px; background: #1E5FAF"></span>縦画の幅</span>
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 3px; background: #B3400A"></span>横画の幅</span>
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 3px; background: #6D28D9"></span>斜画の幅</span>
+            <span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 3px; background: #0F766E"></span>曲線の幅</span>
+          </div>
+        </div>
+
+        <div style="flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+          <div style="font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #4A4D52">検出された関係 — {{selName}}</div>
+          <sc-for list="{{facts}}" as="f" hint-placeholder-count="3">
+            <div style="font-size: 12px; color: #4A4D52">{{f.t}}</div>
+          </sc-for>
+          <sc-for list="{{rels}}" as="r" hint-placeholder-count="3">
+            <label style="display: flex; gap: 10px; align-items: flex-start; min-height: 28px; cursor: pointer">
+              <input type="checkbox" checked="{{r.on}}" onChange="{{r.toggle}}" style="margin-top: 3px">
+              <span style="display: flex; flex-direction: column; gap: 2px">
+                <span style="font-size: 13px; font-weight: 700">{{r.kind}}</span>
+                <span style="font-size: 12px; color: #4A4D52">{{r.desc}}</span>
+              </span>
+            </label>
+          </sc-for>
+          <div style="font-size: 12px; font-family: 'IBM Plex Mono', monospace; color: #4A4D52; padding-top: 10px; border-top: 1px solid #D6D2C8">画の幅（測定範囲 → 補正後）</div>
+          <sc-for list="{{rows}}" as="w" hint-placeholder-count="3">
+            <div style="display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; font-size: 12px; align-items: baseline">
+              <span style="font-weight: 700">{{w.name}}</span>
+              <span style="font-family: 'IBM Plex Mono', monospace">{{w.th}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside style="flex: 1 1 320px; box-sizing: border-box; background: #26282B; border-left: 1px solid #34373B; padding: 20px; display: flex; flex-direction: column; gap: 22px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.02em">光学補正</h2>
+      <span style="font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #A3A7AD">v0.7 mock</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 12px; color: #A3A7AD">ウェイト</span>
+      <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px" role="group" aria-label="ウェイト">
+        <sc-for list="{{weights}}" as="wt" hint-placeholder-count="5">
+          <button type="button" onClick="{{wt.pick}}" aria-pressed="{{wt.on}}" style="{{wt.style}}"><span style="font-size: 12px; font-weight: 700">{{wt.label}}</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 10px">{{wt.sub}}</span></button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 12px; color: #A3A7AD">補正プリセット</span>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px" role="group" aria-label="プリセット">
+        <sc-for list="{{presets}}" as="pr" hint-placeholder-count="3">
+          <button type="button" onClick="{{pr.pick}}" aria-pressed="{{pr.on}}" style="{{pr.style}}">{{pr.label}}</button>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-for list="{{sections}}" as="sec" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; gap: 14px; padding-top: 16px; border-top: 1px solid #34373B">
+        <div style="font-size: 12px; font-weight: 700; color: #A3A7AD; letter-spacing: 0.04em">{{sec.title}}</div>
+        <sc-for list="{{sec.items}}" as="it" hint-placeholder-count="2">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px">
+              <label for="{{it.id}}" style="font-size: 13px; color: #D4D6D9">{{it.label}}</label>
+              <span style="font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #A3A7AD">{{it.text}}</span>
+            </div>
+            <input id="{{it.id}}" type="range" min="{{it.min}}" max="{{it.max}}" step="1" value="{{it.value}}" onChange="{{it.change}}">
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+
+    <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 1px solid #34373B">
+      <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #D4D6D9; min-height: 28px"><input type="checkbox" checked="{{ana}}" onChange="{{toggleAna}}">解析・アンカーを表示</label>
+      <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #D4D6D9; min-height: 28px"><input type="checkbox" checked="{{ghost}}" onChange="{{toggleGhost}}">元の塗りを重ねる</label>
+      <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #D4D6D9; min-height: 28px"><input type="checkbox" checked="{{guides}}" onChange="{{toggleGuides}}">メトリクスガイドを表示</label>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid #34373B">
+      <div style="font-size: 12px; color: #A3A7AD">対象：選択中の塗りパス {{pathCount}} 個 / {{glyphCount}} グリフ</div>
+      <button type="button" style="min-height: 44px; border: 0; border-radius: 8px; background: #5AA9FF; color: #0B1A2A; font-size: 14px; font-weight: 700; cursor: pointer">解析して適用</button>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <button type="button" style="min-height: 44px; border: 1px solid #44484E; border-radius: 8px; background: transparent; color: #E8E8E8; font-size: 13px; cursor: pointer">別ウェイトとして複製</button>
+        <button type="button" onClick="{{reset}}" style="min-height: 44px; border: 1px solid #44484E; border-radius: 8px; background: transparent; color: #E8E8E8; font-size: 13px; cursor: pointer">リセット</button>
+      </div>
+    </div>
+  </aside>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1100}}'>
+var ML = {ft:700, fb:0, mid:350, top:740, bot:-40, band:4, spanK:2, lTop:'キャップハイト', lBot:'ベースライン'};
+var MK = {ft:760, fb:-70, mid:345, top:820, bot:-130, band:60, spanK:4, lTop:'字面上端', lBot:'字面下端'};
+var STEP = 6, CAPD = 100, KAPPA = 0.5523;
+
+/* ---------- 幾何ユーティリティ ---------- */
+function smooth(d,R){ return d >= R ? 0 : (1+Math.cos(Math.PI*d/R))/2; }
+function clipPoly(poly,f){
+  var out=[], n=poly.length;
+  for (var i=0;i<n;i++){
+    var a=poly[i], b=poly[(i+1)%n], fa=f(a), fb=f(b);
+    if (fa >= 0) out.push(a);
+    if ((fa >= 0) !== (fb >= 0)){ var t=fa/(fa-fb); out.push([a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]); }
+  }
+  return out;
+}
+function polyArea(poly){ var s=0; for (var i=0;i<poly.length;i++){ var a=poly[i], b=poly[(i+1)%poly.length]; s+=a[0]*b[1]-b[0]*a[1]; } return s/2; }
+function median(v){ if (!v.length) return 0; var c=v.slice().sort(function(a,b){ return a-b; }); return c[Math.floor(c.length/2)]; }
+
+/* ---------- パス表現：セグメント {a, c1, c2, b, line} の閉じた列 ---------- */
+function L(a,b){ return {a:a, c1:a, c2:b, b:b, line:true}; }
+function Cv(a,c1,c2,b){ return {a:a, c1:c1, c2:c2, b:b, line:false}; }
+function fromPoly(pts){ var s=[]; for (var i=0;i<pts.length;i++) s.push(L(pts[i], pts[(i+1)%pts.length])); return s; }
+function reverseC(segs){ return segs.slice().reverse().map(function(g){ return {a:g.b, c1:g.c2, c2:g.c1, b:g.a, line:g.line}; }); }
+function bez(g,t){ var u=1-t; return [u*u*u*g.a[0]+3*u*u*t*g.c1[0]+3*u*t*t*g.c2[0]+t*t*t*g.b[0], u*u*u*g.a[1]+3*u*u*t*g.c1[1]+3*u*t*t*g.c2[1]+t*t*t*g.b[1]]; }
+function bezD(g,t){ var u=1-t; return [3*u*u*(g.c1[0]-g.a[0])+6*u*t*(g.c2[0]-g.c1[0])+3*t*t*(g.b[0]-g.c2[0]), 3*u*u*(g.c1[1]-g.a[1])+6*u*t*(g.c2[1]-g.c1[1])+3*t*t*(g.b[1]-g.c2[1])]; }
+function nrm(v){ var l=Math.hypot(v[0],v[1])||1; return [v[0]/l, v[1]/l]; }
+function startTan(g){ return nrm(g.line ? [g.b[0]-g.a[0], g.b[1]-g.a[1]] : bezD(g, 0.001)); }
+function endTan(g){ return nrm(g.line ? [g.b[0]-g.a[0], g.b[1]-g.a[1]] : bezD(g, 0.999)); }
+function flatten(segs){ var pts=[]; segs.forEach(function(g){ var k=g.line ? 1 : 16; for (var j=0;j<k;j++) pts.push(bez(g, j/k)); }); return pts; }
+function orientC(segs, pos){ var a=polyArea(flatten(segs)); return ((a >= 0) === pos) ? segs : reverseC(segs); }
+
+/* ---------- サンプル入力：Illustrator 上の塗りパス（重なり・太さムラあり、曲線はベジェ） ---------- */
+function box(x0,y0,x1,y1){ return fromPoly([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]); }
+function slab(xa,ya,xb,yb,th,m){
+  var dx=xb-xa, dy=yb-ya, Ln=Math.hypot(dx,dy), ux=dx/Ln, uy=dy/Ln, nx=-uy*th/2, ny=ux*th/2;
+  xa-=ux*th; ya-=uy*th; xb+=ux*th; yb+=uy*th;
+  var q=[[xa+nx,ya+ny],[xb+nx,yb+ny],[xb-nx,yb-ny],[xa-nx,ya-ny]];
+  q=clipPoly(q, function(v){ return v[1]-m.fb; }); q=clipPoly(q, function(v){ return m.ft-v[1]; });
+  if (polyArea(q) < 0) q.reverse();
+  return fromPoly(q);
+}
+function ellipseC(cx,cy,rx,ry,ccw){
+  var k=KAPPA, P=[[cx+rx,cy],[cx,cy+ry],[cx-rx,cy],[cx,cy-ry]], s=[];
+  s.push(Cv(P[0],[cx+rx,cy+ry*k],[cx+rx*k,cy+ry],P[1]));
+  s.push(Cv(P[1],[cx-rx*k,cy+ry],[cx-rx,cy+ry*k],P[2]));
+  s.push(Cv(P[2],[cx-rx,cy-ry*k],[cx-rx*k,cy-ry],P[3]));
+  s.push(Cv(P[3],[cx+rx*k,cy-ry],[cx+rx,cy-ry*k],P[0]));
+  return ccw ? s : reverseC(s);
+}
+// 筆の中心線（ベジェ）から塗りの輪郭を作る：側面はベジェ、端は丸（四分円2つ）
+function brush(cl, th){
+  var h=th/2, k=KAPPA*h, Ls=[], Rs=[];
+  function add(p,v,s){ return [p[0]+v[0]*s, p[1]+v[1]*s]; }
+  cl.forEach(function(c){
+    var g={a:[c[0],c[1]], c1:[c[2],c[3]], c2:[c[4],c[5]], b:[c[6],c[7]], line:false};
+    var t0=startTan(g), t1=endTan(g), n0=[-t0[1],t0[0]], n1=[-t1[1],t1[0]];
+    Ls.push(Cv(add(g.a,n0,h), add(g.c1,n0,h), add(g.c2,n1,h), add(g.b,n1,h)));
+    Rs.push(Cv(add(g.a,n0,-h), add(g.c1,n0,-h), add(g.c2,n1,-h), add(g.b,n1,-h)));
+  });
+  var gl=Ls[Ls.length-1], E=[cl[cl.length-1][6], cl[cl.length-1][7]];
+  var gE={a:[0,0], c1:[0,0], c2:[cl[cl.length-1][4], cl[cl.length-1][5]], b:E, line:false}, tE=nrm([E[0]-gE.c2[0], E[1]-gE.c2[1]]), nE=[-tE[1],tE[0]];
+  var S=[cl[0][0], cl[0][1]], tS=nrm([cl[0][2]-S[0], cl[0][3]-S[1]]), nS=[-tS[1],tS[0]];
+  var A1=add(E,nE,h), M1=add(E,tE,h), B1=add(E,nE,-h);
+  var capE=[Cv(A1, add(A1,tE,k), add(M1,nE,k), M1), Cv(M1, add(M1,nE,-k), add(B1,tE,k), B1)];
+  var A2=add(S,nS,-h), M2=add(S,tS,-h), B2=add(S,nS,h);
+  var capS=[Cv(A2, add(A2,tS,-k), add(M2,nS,-k), M2), Cv(M2, add(M2,nS,k), add(B2,tS,-k), B2)];
+  return orientC(Ls.concat(capE, reverseC(Rs), capS), true);
+}
+
+var INPUT = {
+  'H':{adv:652, k:0, c:[box(60,0,148,700), box(500,0,592,700), box(100,310,550,398)]},
+  'O':{adv:700, k:0, c:[ellipseC(350,350,300,350,true), ellipseC(350,350,210,266,false)]},
+  'T':{adv:620, k:0, c:[box(30,610,590,700), box(266,0,356,640)]},
+  'A':{adv:620, k:0, c:[slab(90,0,310,700,92,ML), slab(530,0,310,700,90,ML), box(150,180,470,264)]},
+  'V':{adv:620, k:0, c:[slab(90,700,310,0,92,ML), slab(530,700,310,0,90,ML)]},
+  'X':{adv:620, k:0, c:[slab(80,0,540,700,90,ML), slab(540,0,80,700,88,ML)]},
+  'E':{adv:580, k:0, c:[box(60,0,150,700), box(60,614,500,700), box(60,306,450,390), box(60,0,520,88)]},
+  'い':{adv:900, k:1, c:[brush([[230,650,200,430,195,190,275,95],[275,95,300,65,335,110,350,165]],92), brush([[610,560,690,500,735,420,745,300]],86)]},
+  'う':{adv:900, k:1, c:[brush([[390,720,450,700,520,680,580,660]],84), brush([[250,470,420,550,700,570,700,340],[700,340,700,120,520,0,320,-30]],92)]},
+  'こ':{adv:900, k:1, c:[brush([[290,600,420,630,560,640,650,615]],90), brush([[230,230,250,90,400,60,700,110]],94)]},
+  'し':{adv:900, k:1, c:[brush([[330,730,320,500,300,260,330,130],[330,130,360,20,560,10,730,210]],92)]},
+  'す':{adv:900, k:1, c:[brush([[120,570,350,590,600,600,800,575]],88), brush([[460,770,462,650,464,520,466,400],[466,400,470,220,440,80,340,-20]],92), ellipseC(392,415,92,84,true), ellipseC(392,415,24,22,false)]},
+  'の':{adv:900, k:1, c:[brush([[470,630,440,420,380,200,290,70],[290,70,240,0,140,120,150,330],[150,330,160,600,380,720,520,700],[520,700,720,680,800,500,760,330],[760,330,720,150,600,60,510,40]],90)]}
+};
+var LATIN = ['H','O','T','A','V','X','E'];
+var KANA = ['い','う','こ','し','す','の'];
+
+/* ---------- 内外判定とレイ（平坦化した輪郭で計算） ---------- */
+function windingAt(cs, x, y){
+  var w=0;
+  for (var c=0;c<cs.length;c++){
+    var P=cs[c], n=P.length;
+    for (var i=0;i<n;i++){
+      var a=P[i], b=P[(i+1)%n], isl=(b[0]-a[0])*(y-a[1])-(x-a[0])*(b[1]-a[1]);
+      if (a[1] <= y){ if (b[1] > y && isl > 0) w++; }
+      else if (b[1] <= y && isl < 0) w--;
+    }
+  }
+  return w;
+}
+function rayExit(cs, edges, qx, qy, nx, ny){
+  var w=windingAt(cs, qx, qy); if (w === 0) return 0;
+  var hits=[];
+  for (var k=0;k<edges.length;k++){
+    var e=edges[k], ex=e[2]-e[0], ey=e[3]-e[1], den=nx*ey-ny*ex;
+    if (Math.abs(den) < 1e-9) continue;
+    var ax=e[0]-qx, ay=e[1]-qy, t=(ax*ey-ay*ex)/den, u=(ax*ny-ay*nx)/den;
+    if (t > 1e-6 && u >= 0 && u < 1) hits.push([t, (ex*ny-ey*nx) > 0 ? 1 : -1]);
+  }
+  hits.sort(function(a,b){ return a[0]-b[0]; });
+  for (var h=0;h<hits.length;h++){ w += hits[h][1]; if (w === 0) return hits[h][0]; }
+  return 1200;
+}
+
+
+/* ---------- 前処理：曲線を x/y 極値で分割（フォント制作の定石。測定と変形の精度が上がる） ---------- */
+function splitBez(g, t){
+  var lerp=function(p,q,u){ return [p[0]+(q[0]-p[0])*u, p[1]+(q[1]-p[1])*u]; };
+  var p01=lerp(g.a,g.c1,t), p12=lerp(g.c1,g.c2,t), p23=lerp(g.c2,g.b,t), q0=lerp(p01,p12,t), q1=lerp(p12,p23,t), m=lerp(q0,q1,t);
+  return [Cv(g.a,p01,q0,m), Cv(m,q1,p23,g.b)];
+}
+function extremaTs(g){
+  var ts=[];
+  [0,1].forEach(function(k){
+    var p0=g.c1[k]-g.a[k], p1=g.c2[k]-g.c1[k], p2=g.b[k]-g.c2[k];
+    var qa=p0-2*p1+p2, qb=p1-p0, qc=p0;               // qa t^2 + 2 qb t + qc = 0
+    if (Math.abs(qa) < 1e-9){ if (Math.abs(qb) > 1e-9) ts.push(-qc/(2*qb)); }
+    else { var D=qb*qb-qa*qc; if (D >= 0){ var r=Math.sqrt(D); ts.push((-qb+r)/qa, (-qb-r)/qa); } }
+  });
+  return ts.filter(function(t){ return t > 0.03 && t < 0.97; }).sort(function(a,b){ return a-b; })
+    .filter(function(t, i, arr){ return i===0 || t-arr[i-1] > 0.03; });
+}
+function addExtrema(segs){
+  var out=[], added=0;
+  segs.forEach(function(g){
+    if (g.line){ out.push(g); return; }
+    var ts=extremaTs(g), cur=g, prev=0;
+    ts.forEach(function(t){ var u=(t-prev)/(1-prev), sp=splitBez(cur, u); out.push(sp[0]); cur=sp[1]; prev=t; added++; });
+    out.push(cur);
+  });
+  return {segs:out, added:added};
+}
+function rayEnter(cs, edges, qx, qy, nx, ny){
+  var w=windingAt(cs, qx, qy); if (w !== 0) return 0;
+  var hits=[];
+  for (var k=0;k<edges.length;k++){
+    var e=edges[k], ex=e[2]-e[0], ey=e[3]-e[1], den=nx*ey-ny*ex;
+    if (Math.abs(den) < 1e-9) continue;
+    var ax=e[0]-qx, ay=e[1]-qy, t=(ax*ey-ay*ex)/den, u=(ax*ny-ay*nx)/den;
+    if (t > 1e-6 && u >= 0 && u < 1) hits.push([t, (ex*ny-ey*nx) > 0 ? 1 : -1]);
+  }
+  hits.sort(function(a,b){ return a[0]-b[0]; });
+  for (var h=0;h<hits.length;h++){ w += hits[h][1]; if (w !== 0) return hits[h][0]; }
+  return 1000;
+}
+
+/* ---------- 解析：ヒンティングと同じ考え方で「画」を測る ---------- */
+function analyze(ch){
+  var gd=INPUT[ch], m=gd.k ? MK : ML, added=0;
+  var C=gd.c.map(function(segs){ var r=addExtrema(segs); added+=r.added; return r.segs; });
+  var flat=C.map(function(segs){ var p=[]; segs.forEach(function(g){ var k=g.line ? Math.max(1, Math.ceil(Math.hypot(g.b[0]-g.a[0], g.b[1]-g.a[1])/STEP)) : 24; for (var j=0;j<k;j++) p.push(bez(g, j/k)); }); return p; });
+  var ins=function(x,y){ return windingAt(flat,x,y) !== 0; };
+  var edges=[]; flat.forEach(function(P){ for (var i=0;i<P.length;i++){ var a=P[i], b=P[(i+1)%P.length]; edges.push([a[0],a[1],b[0],b[1]]); } });
+  var SEG=C.map(function(segs, ci){
+    return segs.map(function(g, si){
+      var len=g.line ? Math.hypot(g.b[0]-g.a[0], g.b[1]-g.a[1]) : 0;
+      var k=g.line ? Math.max(2, Math.ceil(len/STEP)) : 20, sm=[];
+      for (var j=0;j<=k;j++){
+        var t=(j+0.5)/(k+1), P=bez(g,t), T=nrm(g.line ? [g.b[0]-g.a[0], g.b[1]-g.a[1]] : bezD(g,t));
+        var s={x:P[0], y:P[1], tx:T[0], ty:T[1], t:t, nx:-T[1], ny:T[0]};
+        s.vis = ins(s.x+s.nx*1.5, s.y+s.ny*1.5) && !ins(s.x-s.nx*1.5, s.y-s.ny*1.5);
+        if (s.vis){
+          s.w = rayExit(flat, edges, s.x+s.nx*0.75, s.y+s.ny*0.75, s.nx, s.ny) + 0.75;
+          s.gap = rayEnter(flat, edges, s.x-s.nx*0.75, s.y-s.ny*0.75, -s.nx, -s.ny) + 0.75;
+          s.cap = s.w > 120 && !ins(s.x+s.tx*CAPD+s.nx*2, s.y+s.ty*CAPD+s.ny*2) && !ins(s.x-s.tx*CAPD+s.nx*2, s.y-s.ty*CAPD+s.ny*2);
+        }
+        sm.push(s);
+      }
+      var t0=startTan(g), t1=endTan(g), ang=Math.atan2(Math.abs(t0[1]), Math.abs(t0[0]))*180/Math.PI;
+      return {ci:ci, si:si, g:g, sm:sm, n0:[-t0[1],t0[0]], n1:[-t1[1],t1[0]], t0:t0, t1:t1, cls: g.line ? (ang < 15 ? 'h' : (ang > 75 ? 'v' : 'd')) : 'c'};
+    });
+  });
+  return {ch:ch, m:m, script:gd.k ? 'kana' : 'latin', adv:gd.adv, C:C, flat:flat, ins:ins, SEG:SEG, edges:edges, addedEx:added};
+}
+function finish(A, Wm){
+  var m=A.m, all=[];
+  A.SEG.forEach(function(segs){ segs.forEach(function(S){ all.push(S); }); });
+  all.forEach(function(S){
+    var vis=S.sm.filter(function(s){ return s.vis; }), body=vis.filter(function(s){ return !s.cap; });
+    S.visFrac=vis.length/S.sm.length;
+    S.capFrac=vis.length ? (vis.length-body.length)/vis.length : 0;
+    var good=body.filter(function(s){ return s.w < 1.6*Wm; });
+    S.longFrac=body.length ? 1-good.length/body.length : 0;
+    S.hidden=S.visFrac < 0.25;
+    S.isCap=!S.hidden && S.capFrac > 0.5;
+    S.coincide=!S.hidden && !S.isCap && S.longFrac > 0.6;
+    var g=S.g;
+    S.onMetric = g.line && S.cls==='h' && (Math.abs(g.a[1]-m.ft) < 2 && Math.abs(g.b[1]-m.ft) < 2 || Math.abs(g.a[1]-m.fb) < 2 && Math.abs(g.b[1]-m.fb) < 2);
+    // 測定値：直線は辺全体の中央値、曲線はサンプルごとの値を移動中央値でならす
+    if (g.line){
+      S.w=median(good.map(function(s){ return s.w; })) || Wm;
+      S.gap=median(good.map(function(s){ return s.gap; })) || 1000;
+      var hy=good.map(function(s){ return s.y+s.ny*S.w; });
+      S.opp = S.cls==='h' && hy.length > 0 && hy.filter(function(y){ return Math.abs(y-m.ft) < 3 || Math.abs(y-m.fb) < 3; }).length > hy.length/2;
+    } else {
+      var n=S.sm.length;
+      S.sm.forEach(function(s, i){
+        var v=[], gv=[];
+        for (var d=-3; d<=3; d++){ var o=S.sm[i+d]; if (o && o.vis && !o.cap && o.w < 1.6*Wm){ v.push(o.w); gv.push(o.gap); } }
+        s.wf = v.length ? median(v) : null; s.gf = gv.length ? median(gv) : 1000;
+      });
+      var known=S.sm.filter(function(s){ return s.wf != null; });
+      S.sm.forEach(function(s){
+        if (s.wf != null) return;
+        var best=null, bd=9; known.forEach(function(o){ var d=Math.abs(o.t-s.t); if (d<bd){ bd=d; best=o; } });
+        s.wf = best ? best.wf : Wm; s.gf = best ? best.gf : 1000;
+      });
+      S.opp=false;
+    }
+  });
+  // 一致する辺・隠れた辺の追従先
+  all.forEach(function(S){
+    if (!(S.hidden || S.coincide) || !S.g.line) return;
+    var g=S.g, mx=(g.a[0]+g.b[0])/2, my=(g.a[1]+g.b[1])/2, best=null, bd=1e9;
+    all.forEach(function(O){
+      if (O.ci===S.ci || !O.g.line || O.hidden || O.coincide || O.isCap) return;
+      if (Math.abs(S.t0[0]*O.t0[1]-S.t0[1]*O.t0[0]) > 0.05) return;
+      var og=O.g, ox=og.b[0]-og.a[0], oy=og.b[1]-og.a[1], ol=Math.hypot(ox,oy);
+      var u=((mx-og.a[0])*ox+(my-og.a[1])*oy)/(ol*ol); if (u < -0.2 || u > 1.2) return;
+      var d=Math.abs((mx-og.a[0])*oy-(my-og.a[1])*ox)/ol;
+      if (S.coincide && d > 2) return;
+      if (S.hidden && d > 1.6*Wm) return;
+      if (d < bd){ bd=d; best=O; }
+    });
+    S.follow=best;
+  });
+  // オーバーシュート候補
+  var vs=[]; all.forEach(function(S){ S.sm.forEach(function(s){ if (s.vis) vs.push({s:s, seg:S}); }); });
+  var feats=[];
+  [1,-1].forEach(function(sgn){
+    var pool=vs.filter(function(o){ return sgn>0 ? o.s.y >= m.ft-m.band : o.s.y <= m.fb+m.band; });
+    pool.sort(function(a,b){ return a.s.x-b.s.x; });
+    var grp=[];
+    function flush(){
+      if (!grp.length) return;
+      var mn=grp[0].s.x, mx=grp[grp.length-1].s.x, cx=0, ey=sgn>0 ? -1e9 : 1e9, curved=false;
+      grp.forEach(function(o){ cx+=o.s.x; if (sgn>0 ? o.s.y>ey : o.s.y<ey) ey=o.s.y; if (!o.seg.g.line) curved=true; });
+      cx/=grp.length;
+      var span=mx-mn, apex=false;
+      if (!curved){
+        var yy=ey-sgn*2.5*Wm, runs=0, inside=false;
+        for (var xx=cx-2*Wm; xx<=cx+2*Wm; xx+=4){ var v=A.ins(xx,yy); if (v && !inside) runs++; inside=v; }
+        apex = runs >= 2 && span < 1.4*Wm;
+      }
+      if (span < m.spanK*Wm && (curved || apex)) feats.push({x:cx, y:ey, s:sgn, kind: curved ? '曲線' : '頂点'});
+      grp=[];
+    }
+    pool.forEach(function(o){ if (grp.length && o.s.x-grp[grp.length-1].s.x > 30) flush(); grp.push(o); });
+    flush();
+  });
+  A.feats=feats;
+  var band=0.12*(m.ft-m.fb);
+  A.ocC=A.SEG.map(function(segs){
+    var len=0, tot=0;
+    segs.forEach(function(S){ var l=Math.hypot(S.g.b[0]-S.g.a[0], S.g.b[1]-S.g.a[1]); if (!S.hidden) tot+=l; });
+    segs.forEach(function(S){ if (S.cls!=='h' || S.hidden || !S.g.line) return; var cy=(S.g.a[1]+S.g.b[1])/2+S.n0[1]*S.w/2; if (Math.abs(cy-m.mid) < band && S.w < 1.6*Wm) len+=Math.hypot(S.g.b[0]-S.g.a[0], S.g.b[1]-S.g.a[1]); });
+    return tot > 0 && len/tot > 0.5;
+  });
+  var xs=[]; A.C.forEach(function(segs){ segs.forEach(function(g){ xs.push(g.a[0]); }); });
+  A.cx=(Math.min.apply(null,xs)+Math.max.apply(null,xs))/2;
+  A.anchorsIn=INPUT[A.ch].c.reduce(function(t,segs){ return t+segs.length; }, 0);
+  A.stats={metric:0, hidden:0, coincide:0};
+  all.forEach(function(S){ if (S.onMetric) A.stats.metric++; if (S.hidden) A.stats.hidden++; if (S.coincide) A.stats.coincide++; });
+  A.all=all;
+  return A;
+}
+
+var AN={}; Object.keys(INPUT).forEach(function(ch){ AN[ch]=analyze(ch); });
+var WM=(function(){ var v=[]; Object.keys(AN).forEach(function(ch){ AN[ch].SEG.forEach(function(segs){ segs.forEach(function(S){ S.sm.forEach(function(s){ if (s.vis && !s.cap && Math.abs(s.ty) > 0.97 && s.w < 300) v.push(s.w); }); }); }); }); return Math.round(median(v) || 90); })();
+Object.keys(AN).forEach(function(ch){ finish(AN[ch], WM); });
+
+// 標準ステム（StdVW / StdHW 相当）を書体系ごとに：直線の画＋曲線の極値で測る
+var STEMS={};
+['latin','kana'].forEach(function(sc){
+  var V=[], H=[];
+  Object.keys(AN).forEach(function(ch){
+    var A=AN[ch]; if (A.script!==sc) return;
+    A.all.forEach(function(S){
+      if (S.hidden || S.isCap || S.coincide) return;
+      if (S.g.line){ if (S.cls==='v') V.push(S.w); else if (S.cls==='h') H.push(S.w); return; }
+      S.sm.forEach(function(s){ if (!s.vis || s.cap) return; if (Math.abs(s.ty) > 0.995) V.push(s.wf); else if (Math.abs(s.tx) > 0.995) H.push(s.wf); });
+    });
+  });
+  var v=median(V) || WM, h=median(H) || v;
+  STEMS[sc]={V:v, H:h, ratio:h/v};
+});
+var RATIO0=Math.round(STEMS.latin.ratio*100);
+
+/* ---------- 太さの目標値：縦横の異方性モデル ---------- */
+// 画の法線 n=(nx,ny)：縦画は nx=±1、横画は ny=±1。方向ごとの基準と目標を n² で補間する
+function stemModel(A, p){
+  var st=STEMS[A.script], Vt=p.W*st.V/WM, Ht=Vt*p.ratio;
+  return {stdV:st.V, stdH:st.H, Vt:Vt, Ht:Ht};
+}
+function targetFor(w, nx, ny, M, p){
+  var a=nx*nx, b=ny*ny, std=a*M.stdV+b*M.stdH, tgt=a*M.Vt+b*M.Ht;
+  var prop=w*tgt/std;                               // ムラを残したままウェイトだけ変える
+  var dev=Math.abs(w-std)/std, inTol=dev <= p.tol ? 1 : Math.max(0, 1-(dev-p.tol)/0.15); // 許容幅の外は揃えない
+  var wt=prop+(tgt-prop)*p.uni*inTol;
+  var s2=2*nx*ny; wt*=1-p.dg*s2*s2;                 // 斜画の補正
+  return wt;
+}
+function dFrom(w, gap, nx, ny, k, M, p){
+  var wt=targetFor(w, nx, ny, M, p), d=k*(w-wt)/2;
+  if (d < 0 && gap < 900){                         // カウンター保護：内側の空きを最小幅以上に保つ
+    var minGap=p.mg*M.Vt, room=Math.max(0, (gap-minGap)/2);
+    if (-d > room) d=-room;
+  }
+  return d;
+}
+// セグメントの法線オフセット量 d(t) を返す関数（内向き正）
+function segDFun(S, M, p){
+  if (S.onMetric) return function(){ return 0; };
+  var k=S.opp ? 2 : 1;
+  if (S.g.line){ var d=dFrom(S.w, S.gap, S.n0[0], S.n0[1], k, M, p); return function(){ return d; }; }
+  // 曲線は 3 区間の中央値から 2 次式で d(t) をなめらかに近似（測定ノイズで点が増えないように）
+  var ds=S.sm.map(function(s){ return {t:s.t, d:dFrom(s.wf, s.gf, s.nx, s.ny, 1, M, p)}; });
+  var part=function(lo,hi){ return median(ds.filter(function(o){ return o.t>=lo && o.t<=hi; }).map(function(o){ return o.d; })); };
+  var d0=part(0,0.3), dm=part(0.35,0.65), d1=part(0.7,1);
+  return function(t){ var u=1-t; return d0*u*(1-2*t)+dm*4*t*u+d1*t*(2*t-1); };
+}
+function constF(v){ return function(){ return v; }; }
+
+/* ---------- 変形：アンカーは移動、曲線は Tiller–Hanson＋誤差判定で必要なときだけ分割 ---------- */
+function lineX(p1, d1, p2, d2){
+  var den=d1[0]*d2[1]-d1[1]*d2[0]; if (Math.abs(den) < 1e-6) return null;
+  var t=((p2[0]-p1[0])*d2[1]-(p2[1]-p1[1])*d2[0])/den; return [p1[0]+d1[0]*t, p1[1]+d1[1]*t];
+}
+function leftN(v){ var n=nrm(v); return [-n[1], n[0]]; }
+function offsetCurve(g, a2, b2, D, tol, depth, out){
+  // g: 元の区間、a2/b2: 移動後の端点、D(t): 元曲線上の t における内向きオフセット量
+  var e1=[g.c1[0]-g.a[0], g.c1[1]-g.a[1]], e2=[g.c2[0]-g.c1[0], g.c2[1]-g.c1[1]], e3=[g.b[0]-g.c2[0], g.b[1]-g.c2[1]];
+  var l1=Math.hypot(e1[0],e1[1]), l2=Math.hypot(e2[0],e2[1]), l3=Math.hypot(e3[0],e3[1]);
+  var c1, c2;
+  if (l1 > 1e-6 && l2 > 1e-6 && l3 > 1e-6){
+    var n2=leftN(e2), dm=D(0.5), q=[g.c1[0]+n2[0]*dm, g.c1[1]+n2[1]*dm];
+    c1=lineX(a2, e1, q, e2); c2=lineX(b2, e3, q, e2);
+    if (c1 && Math.hypot(c1[0]-a2[0], c1[1]-a2[1]) > 3*l1+20) c1=null;
+    if (c2 && Math.hypot(c2[0]-b2[0], c2[1]-b2[1]) > 3*l3+20) c2=null;
+  }
+  if (!c1) c1=[g.c1[0]+(a2[0]-g.a[0]), g.c1[1]+(a2[1]-g.a[1])];
+  if (!c2) c2=[g.c2[0]+(b2[0]-g.b[0]), g.c2[1]+(b2[1]-g.b[1])];
+  var cand={a:a2, c1:c1, c2:c2, b:b2, line:false};
+  // 誤差：真のオフセット点（元の点＋法線×d）と候補曲線の距離
+  var err=0;
+  for (var j=1;j<8;j++){
+    var t=j/8, P=bez(g,t), T=nrm(bezD(g,t)), d=D(t), Q=[P[0]-T[1]*d, P[1]+T[0]*d], best=1e9;
+    var prevR=bez(cand,0);
+    for (var k=1;k<=48;k++){ var R=bez(cand, k/48), sx=R[0]-prevR[0], sy=R[1]-prevR[1], sl=sx*sx+sy*sy, u=sl>0 ? Math.max(0, Math.min(1, ((Q[0]-prevR[0])*sx+(Q[1]-prevR[1])*sy)/sl)) : 0;
+      var dd=Math.hypot(prevR[0]+sx*u-Q[0], prevR[1]+sy*u-Q[1]); if (dd<best) best=dd; prevR=R; }
+    if (best > err) err=best;
+  }
+  if (err <= tol || depth >= 2){ out.push(cand); return; }
+  var sp=splitBez(g, 0.5), P=sp[0].b, T=nrm(bezD(g,0.5)), dmid=D(0.5), M2=[P[0]-T[1]*dmid, P[1]+T[0]*dmid];
+  offsetCurve(sp[0], a2, M2, function(t){ return D(t/2); }, tol, depth+1, out);
+  offsetCurve(sp[1], M2, b2, function(t){ return D(0.5+t/2); }, tol, depth+1, out);
+}
+function deform(A, p, offF){
+  var M=stemModel(A, p);
+  var DF=A.SEG.map(function(segs){ return segs.map(function(S){ return (S.hidden || S.coincide || S.isCap) ? null : segDFun(S, M, p); }); });
+  A.SEG.forEach(function(segs, ci){ segs.forEach(function(S, si){
+    if (DF[ci][si] || S.isCap) return;
+    if (S.follow){ var F=S.follow, f=DF[F.ci][F.si], v=f ? (f(0)+f(1))/2 : 0; DF[ci][si]=constF(v*(F.n0[0]*S.n0[0]+F.n0[1]*S.n0[1])); }
+    else DF[ci][si]=constF(0);
+  }); });
+  A.SEG.forEach(function(segs, ci){
+    var n=segs.length;
+    for (var pass=0; pass<3; pass++) segs.forEach(function(S, si){
+      if (DF[ci][si]) return;
+      var pv=DF[ci][(si-1+n)%n], nx=DF[ci][(si+1)%n], vals=[];
+      if (pv) vals.push(pv(1)); if (nx) vals.push(nx(0));
+      if (S.g.line) { if (vals.length || pass===2) DF[ci][si]=constF(0); return; }
+      if (vals.length || pass===2){ DF[ci][si]=constF(vals.length ? vals.reduce(function(a,b){ return a+b; },0)/vals.length : 0); }
+    });
+  });
+  var af=A.feats.filter(function(f, k){ return !offF(k); });
+  var dx=(M.Vt-M.stdV)/2*p.cp, m=A.m;
+  function vshift(x, y, ci){
+    var v=A.ocC[ci] ? p.oc : 0;
+    af.forEach(function(F){
+      if (F.kind==='曲線'){ var tt=(y-m.mid)/(F.y-m.mid); if (tt>0) v += F.s*p.os*Math.min(1,tt); }
+      else if (Math.abs(x-F.x) < 1.6*WM && Math.abs(y-F.y) < 0.3*WM) v += F.s*p.os;
+    });
+    return v;
+  }
+  function hshift(x){ return x > A.cx+1 ? dx : (x < A.cx-1 ? -dx : 0); }
+  function post(pt, ci){ return [pt[0]+hshift(pt[0]), pt[1]+vshift(pt[0], pt[1], ci)]; }
+  var added=0;
+  var out=A.SEG.map(function(segs, ci){
+    var n=segs.length, disp=[], dAt=[];
+    for (var i=0;i<n;i++){
+      var Pv=segs[(i-1+n)%n], Nx=segs[i], d1=DF[ci][(i-1+n)%n](1), d2=DF[ci][i](0);
+      var n1=Pv.n1, n2=Nx.n0, corner=(Pv.t1[0]*Nx.t0[0]+Pv.t1[1]*Nx.t0[1]) < 0.985, v;
+      if (corner){
+        var det=n1[0]*n2[1]-n1[1]*n2[0];
+        if (Math.abs(det) > 0.15){
+          v=[(d1*n2[1]-n1[1]*d2)/det, (n1[0]*d2-d1*n2[0])/det];
+          var lim=2*Math.max(Math.abs(d1),Math.abs(d2))+0.5, l=Math.hypot(v[0],v[1]); if (l>lim){ v=[v[0]/l*lim, v[1]/l*lim]; }
+        } else { var dd=(d1+d2)/2, nn=nrm([n1[0]+n2[0], n1[1]+n2[1]]); v=[nn[0]*dd, nn[1]*dd]; }
+      } else { var dd=(d1+d2)/2, nn=nrm([n1[0]+n2[0], n1[1]+n2[1]]); v=[nn[0]*dd, nn[1]*dd]; }
+      disp.push([Nx.g.a[0]+v[0], Nx.g.a[1]+v[1]]);
+      dAt.push(corner ? null : (d1+d2)/2);
+    }
+    var res=[];
+    segs.forEach(function(S, i){
+      var a2=disp[i], b2=disp[(i+1)%n];
+      if (S.g.line){ res.push({a:a2, c1:a2, c2:b2, b:b2, line:true}); return; }
+      // 端点で隣と共有するオフセット量に合わせて d(t) を補正（端のずれで余計に分割しない）
+      var F=DF[ci][i], sA=dAt[i], sB=dAt[(i+1)%n], e0=sA==null ? 0 : sA-F(0), e1=sB==null ? 0 : sB-F(1);
+      var G=function(t){ return F(t)+e0*(1-t)+e1*t; };
+      var parts=[]; offsetCurve(S.g, a2, b2, G, p.prec, 0, parts); added+=parts.length-1;
+      parts.forEach(function(q){ res.push(q); });
+    });
+    return res.map(function(g){ var a=post(g.a,ci), b=post(g.b,ci); return {a:a, c1:g.line ? a : post(g.c1,ci), c2:g.line ? b : post(g.c2,ci), b:b, line:g.line}; });
+  });
+  var cnt=out.reduce(function(t,segs){ return t+segs.length; }, 0);
+  return {C:out, adv:A.adv+2*dx, anchors:cnt, M:M};
+}
+
+function toPath(C, ox, top, yTop){
+  var X=function(v){ return (ox+v[0]).toFixed(1); }, Y=function(v){ return (top+yTop-v[1]).toFixed(1); };
+  return C.map(function(segs){
+    var d='M'+X(segs[0].a)+' '+Y(segs[0].a);
+    segs.forEach(function(g){ d += g.line ? 'L'+X(g.b)+' '+Y(g.b) : 'C'+X(g.c1)+' '+Y(g.c1)+' '+X(g.c2)+' '+Y(g.c2)+' '+X(g.b)+' '+Y(g.b); });
+    return d+'Z';
+  }).join('');
+}
+function anchorMarks(C, ox, top, yTop){
+  var r=7, d='';
+  C.forEach(function(segs){ segs.forEach(function(g){ var x=ox+g.a[0], y=top+yTop-g.a[1]; d+='M'+(x-r).toFixed(1)+' '+(y-r).toFixed(1)+'h'+(2*r)+'v'+(2*r)+'h'+(-2*r)+'Z'; }); });
+  return d;
+}
+function handleLines(C, ox, top, yTop){
+  var d='', P=function(v){ return (ox+v[0]).toFixed(1)+' '+(top+yTop-v[1]).toFixed(1); };
+  C.forEach(function(segs){ segs.forEach(function(g){ if (g.line) return; d+='M'+P(g.a)+'L'+P(g.c1)+'M'+P(g.b)+'L'+P(g.c2); }); });
+  return d;
+}
+function specimen(list, m, p, offOf){
+  var pad=70, ox=30, d='', d0='';
+  list.forEach(function(ch){
+    var A=AN[ch], r=deform(A, p, offOf(ch)), sh=(r.adv-A.adv)/2;
+    d += toPath(r.C, ox, pad, m.top); d0 += toPath(A.C, ox+sh, pad, m.top);
+    ox += r.adv;
+  });
+  var w=ox+30, Y=function(y){ return pad+m.top-y; };
+  return {vb:'0 0 '+w.toFixed(0)+' '+(m.top-m.bot+2*pad), w:w, d:d, d0:d0, t:Y(m.ft), b:Y(m.fb), ot:Y(m.ft+p.os), ob:Y(m.fb-p.os)};
+}
+
+var STD={W:WM, ratio:RATIO0, uni:100, tol:30, dg:8, mg:35, cp:50, prec:2, os:12, oc:16};
+var PRESETS=[
+  {label:'なし', v:{W:WM, ratio:RATIO0, uni:0, tol:30, dg:0, mg:35, cp:0, prec:2, os:0, oc:0}},
+  {label:'標準', v:STD},
+  {label:'強め', v:{W:WM, ratio:Math.round(RATIO0*0.8), uni:100, tol:40, dg:16, mg:35, cp:50, prec:2, os:22, oc:28}}
+];
+var WEIGHTS=[['Thin',0.45],['Light',0.7],['Regular',1],['Bold',1.35],['Black',1.7]];
+var SECTIONS=[
+  {title:'ウェイト', items:[
+    {key:'W', label:'縦画の太さ（検出 StdVW '+WM+'u）', min:30, max:170, unit:'u'},
+    {key:'cp', label:'カウンター保持（字幅で吸収）', min:0, max:100, unit:'%'},
+    {key:'mg', label:'カウンター保護（最小の空き / 縦画）', min:0, max:80, unit:'%'}]},
+  {title:'太さの均一化', items:[
+    {key:'uni', label:'揃える強さ', min:0, max:100, unit:'%'},
+    {key:'tol', label:'揃える範囲（基準からのずれ）', min:5, max:80, unit:'%'}]},
+  {title:'縦横の比率', items:[
+    {key:'ratio', label:'横画 / 縦画（検出 '+RATIO0+'%）', min:40, max:120, unit:'%'},
+    {key:'dg', label:'斜画を細く', min:0, max:30, unit:'%'}]},
+  {title:'光学補正・精度', items:[
+    {key:'os', label:'オーバーシュート（頂点・曲線）', min:0, max:30, unit:'u'},
+    {key:'oc', label:'光学的中心（中央の横画）', min:0, max:40, unit:'u'},
+    {key:'prec', label:'曲線の許容誤差（小さいほど点が増える）', min:1, max:8, unit:'u'}]}
+];
+function frac(s){ return {W:s.W, ratio:s.ratio/100, uni:s.uni/100, tol:s.tol/100, dg:s.dg/100, mg:s.mg/100, cp:s.cp/100, prec:s.prec, os:s.os, oc:s.oc}; }
+function same(a,b){ for (var k in b){ if (a[k] !== b[k]) return false; } return true; }
+var CLSNAME={v:'縦画', h:'横画', d:'斜画', c:'曲線'};
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    var init={}; for (var k in STD) init[k]=STD[k];
+    init.ghost=true; init.guides=true; init.ana=true; init.sel='O'; init.off={};
+    this.state=init;
+  }
+  renderVals(){
+    var self=this, s=this.state, p=frac(s);
+    var offOf=function(ch){ return function(k){ return !!s.off[ch+':f'+k]; }; };
+
+    var sp=specimen(LATIN, ML, p, offOf);
+    var sk=specimen(KANA, MK, p, offOf);
+
+    var A=AN[s.sel], mt=A.m, r=deform(A, p, offOf(s.sel)), M=r.M;
+    var m=60, gap=140, zpad=90, Y=function(y){ return zpad+mt.top-y; };
+    var sh=(r.adv-A.adv)/2, x0=m, x1=m+A.adv+gap, lx=x1+r.adv+30, tx=lx+16, vbW=tx+200, vbH=mt.top-mt.bot+2*zpad+40;
+    var cv='', chh='', cd='', cc='';
+    A.SEG.forEach(function(segs){ segs.forEach(function(S){ S.sm.forEach(function(q, i){
+      if (!q.vis || q.cap || q.w > 1.6*WM || i%3) return;
+      var ww=S.g.line ? S.w : q.wf;
+      var seg='M'+(x0+q.x).toFixed(1)+' '+Y(q.y).toFixed(1)+'L'+(x0+q.x+q.nx*ww).toFixed(1)+' '+Y(q.y+q.ny*ww).toFixed(1);
+      if (S.cls==='v') cv+=seg; else if (S.cls==='h') chh+=seg; else if (S.cls==='d') cd+=seg; else cc+=seg;
+    }); }); });
+    var zm={
+      vb:'0 0 '+vbW.toFixed(0)+' '+vbH, lx:lx, tx:tx,
+      d0:toPath(A.C, x0, zpad, mt.top), d:toPath(r.C, x1, zpad, mt.top), d0b:toPath(A.C, x1+sh, zpad, mt.top),
+      an:anchorMarks(r.C, x1, zpad, mt.top), hl:handleLines(r.C, x1, zpad, mt.top),
+      cv:cv, ch:chh, cd:cd, cc:cc,
+      ot:Y(mt.ft+p.os), t:Y(mt.ft), oc:Y(mt.mid+p.oc), mid:Y(mt.mid), b:Y(mt.fb), ob:Y(mt.fb-p.os),
+      ott:Y(mt.ft+p.os)-10, tt:Y(mt.ft)+28, oct:Y(mt.mid+p.oc)-10, midt:Y(mt.mid)+28, bt:Y(mt.fb)-10,
+      lTop:mt.lTop, lBot:mt.lBot, c0:x0+A.adv/2, c1:x1+r.adv/2, capY:Y(mt.bot)+30
+    };
+    var pct=function(x,y){ return 'left: '+(x/vbW*100).toFixed(2)+'%; top: '+(y/vbH*100).toFixed(2)+'%; '; };
+    var lab='position: absolute; transform: translate(-50%, -50%); font-size: 11px; line-height: 1; padding: 3px 5px; border-radius: 4px; color: #FFFFFF; white-space: nowrap; font-weight: 700; ';
+    var zl=A.feats.map(function(f){ return {t:'O/S', style:lab+pct(x0+f.x, Y(f.y)+(f.s>0 ? -30 : 30))+'background: #1F5FA8'}; });
+
+    var rels=A.feats.map(function(f, k){
+      var key=s.sel+':f'+k;
+      return {kind:'オーバーシュート候補（'+(f.s>0 ? '上' : '下')+'）', desc: f.kind==='頂点' ? '尖った頂点 — 頂点のアンカーを外へ' : '曲線の頂部 — アンカーとハンドルを縦に伸ばす', on:!s.off[key],
+        toggle:function(){ var nx={}; for (var z in self.state.off) nx[z]=self.state.off[z]; nx[key]=!nx[key]; self.setState({off:nx}); }};
+    });
+    var facts=[
+      {t:'メトリクスに乗った辺 '+A.stats.metric+' 本 — 位置を固定して内側へ太らせる／細らせる'},
+      {t:'他の塗りに隠れた辺 '+A.stats.hidden+' 本 — 覆っている辺の動きに追従'},
+      {t:'他の塗りと重なって一致する辺 '+A.stats.coincide+' 本 — 一致する辺に追従'},
+      {t:'極値に追加したアンカー '+A.addedEx+' 個／曲線の精度確保で分割 '+Math.max(0, r.anchors-A.anchorsIn-A.addedEx)+' 個'}
+    ];
+    if (A.ocC.some(Boolean)) facts.push({t:'中央の横画 '+A.ocC.filter(Boolean).length+' 個 — 光学的中心で持ち上げ'});
+
+    var rows=[], st=STEMS[A.script];
+    var pushRow=function(name, vals, nx, ny){ if (!vals.length) return; var mn=Math.min.apply(null,vals), mx=Math.max.apply(null,vals), tg=vals.map(function(w){ return targetFor(w, nx, ny, M, p); }), tn=Math.min.apply(null,tg), tm=Math.max.apply(null,tg);
+      rows.push({name:name, th:Math.round(mn)+'–'+Math.round(mx)+' → '+(Math.round(tn)===Math.round(tm) ? Math.round(tn) : Math.round(tn)+'–'+Math.round(tm))+'u'}); };
+    var V=[], H=[], Dg=[];
+    A.all.forEach(function(S){ if (S.hidden || S.isCap || S.coincide) return;
+      if (S.g.line){ if (S.cls==='v') V.push(S.w); else if (S.cls==='h') H.push(S.w); else Dg.push(S.w); return; }
+      S.sm.forEach(function(q){ if (!q.vis || q.cap) return; if (Math.abs(q.ty) > 0.995) V.push(q.wf); else if (Math.abs(q.tx) > 0.995) H.push(q.wf); }); });
+    pushRow('縦画', V, 1, 0); pushRow('横画', H, 0, 1); pushRow('斜画', Dg, Math.SQRT1_2, Math.SQRT1_2);
+    rows.push({name:'基準', th:'StdVW '+Math.round(st.V)+' / StdHW '+Math.round(st.H)+' → '+Math.round(M.Vt)+' / '+Math.round(M.Ht)+'u'});
+
+    var rd={med:WM, v:Math.round(M.Vt), h:Math.round(M.Ht), ancIn:A.anchorsIn, anc:r.anchors, adv:(Math.round(r.adv-A.adv) >= 0 ? '+' : '')+Math.round(r.adv-A.adv)};
+
+    var pill='min-width: 44px; min-height: 44px; border-radius: 8px; font-size: 18px; font-weight: 700; cursor: pointer; ';
+    function pills(list){
+      return list.map(function(ch){
+        var on=s.sel===ch;
+        return {ch:ch, on:on ? 'true' : 'false',
+          style: pill + (on ? 'background: #141414; color: #F3F1EC; border: 1px solid #141414' : 'background: transparent; color: #141414; border: 1px solid #B9B6AE'),
+          pick:function(){ self.setState({sel:ch}); }};
+      });
+    }
+    var pbtn='min-height: 40px; border-radius: 8px; font-size: 13px; cursor: pointer; ';
+    var presets=PRESETS.map(function(pr){
+      var on=same(s, pr.v);
+      return {label:pr.label, on:on ? 'true' : 'false',
+        style: pbtn + (on ? 'background: #5AA9FF; color: #0B1A2A; border: 1px solid #5AA9FF; font-weight: 700' : 'background: #1F2124; color: #D4D6D9; border: 1px solid #44484E'),
+        pick:function(){ var v={}; for (var k in pr.v) v[k]=pr.v[k]; self.setState(v); }};
+    });
+    var weights=WEIGHTS.map(function(wt){
+      var val=Math.round(WM*wt[1]), on=s.W===val;
+      return {label:wt[0], sub:val+'u', on:on ? 'true' : 'false',
+        style:'min-height: 44px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 4px 2px; ' + (on ? 'background: #E8E8E8; color: #141414; border: 1px solid #E8E8E8' : 'background: #1F2124; color: #D4D6D9; border: 1px solid #44484E'),
+        pick:function(){ self.setState({W:val}); }};
+    });
+    var sections=SECTIONS.map(function(sec){
+      return {title:sec.title, items:sec.items.map(function(it){
+        return {id:'oc-'+it.key, label:it.label, min:it.min, max:it.max, value:s[it.key], text:s[it.key]+it.unit,
+          change:function(e){ var ob={}; ob[it.key]=Number(e.target.value); self.setState(ob); }};
+      })};
+    });
+    var pathCount=0; Object.keys(INPUT).forEach(function(ch){ pathCount += INPUT[ch].c.length; });
+
+    return {
+      sp:sp, sk:sk, zm:zm, zl:zl, rd:rd, rels:rels, facts:facts, rows:rows, noRels:rels.length===0, selName:s.sel,
+      latinPills:pills(LATIN), kanaPills:pills(KANA), presets:presets, weights:weights, sections:sections,
+      pathCount:pathCount, glyphCount:Object.keys(INPUT).length,
+      ghost:s.ghost, guides:s.guides, ana:s.ana,
+      ghostOp:s.ghost ? 0.9 : 0, gOp:s.guides ? 0.55 : 0, anaOp:s.ana ? 1 : 0,
+      toggleGhost:function(){ self.setState({ghost:!self.state.ghost}); },
+      toggleGuides:function(){ self.setState({guides:!self.state.guides}); },
+      toggleAna:function(){ self.setState({ana:!self.state.ana}); },
+      reset:function(){ var v={}; for (var k in STD) v[k]=STD[k]; v.off={}; self.setState(v); }
+    };
+  }
+}
+</script>
+</body>
+</html>
