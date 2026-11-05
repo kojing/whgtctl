@@ -1,2 +1,4 @@
 tests/out/
 .DS_Store
+tools/noto/*.otf
+tools/noto/kana.json

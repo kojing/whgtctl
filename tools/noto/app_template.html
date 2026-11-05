@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Noto Sans JP かなでウェイト合成を試す</title>
+<style>
+  :root{
+    --ground:#F4F3EF; --panel:#FFFFFF; --ink:#151515; --sub:#55585E; --line:#DEDBD3;
+    --accent:#1D5FD1; --cmp:#C2410C; --ghost:#B8B4AA;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font:14px/1.6 system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI",sans-serif}
+  .wrap{display:flex;flex-wrap:wrap;min-height:100vh}
+  aside{flex:1 1 300px;max-width:100%;background:var(--panel);border-right:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:18px}
+  main{flex:999 1 560px;min-width:0;padding:24px;display:flex;flex-direction:column;gap:20px}
+  h1{font-size:20px;margin:0;line-height:1.35}
+  .kicker{font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;color:var(--sub);margin-bottom:6px}
+  .note{font-size:12px;color:var(--sub)}
+  .sec{display:flex;flex-direction:column;gap:10px;padding-top:14px;border-top:1px solid var(--line)}
+  .sec h2{font-size:12px;margin:0;color:var(--sub);letter-spacing:.04em}
+  .seg{display:grid;gap:6px}
+  .seg button{min-height:40px;border:1px solid var(--line);background:#FAFAF8;border-radius:8px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+  .seg button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:700}
+  .row{display:flex;flex-direction:column;gap:4px}
+  .row .lab{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+  .row .val{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--sub)}
+  input[type=range]{width:100%;accent-color:var(--accent);margin:0;height:22px}
+  .chk{display:flex;gap:8px;align-items:center;font-size:13px;min-height:28px}
+  .chk input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+  .btn{min-height:44px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:default}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+  .stats{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:#FAFAF8}
+  .progress{height:6px;background:#E9E6DE;border-radius:3px;overflow:hidden}
+  .progress>div{height:100%;width:0;background:var(--accent);transition:width .1s}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(68px,1fr));gap:4px}
+  .cell{appearance:none;border:1px solid transparent;background:transparent;border-radius:8px;padding:2px;cursor:pointer;min-height:44px}
+  .cell:hover{border-color:var(--line);background:#fff}
+  .cell[aria-pressed="true"]{border-color:var(--accent);background:#fff}
+  .cell svg{display:block;width:100%;height:auto}
+  .insp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .insp figure{margin:0;display:flex;flex-direction:column;gap:6px}
+  .insp figcaption{font-size:12px;color:var(--sub);display:flex;justify-content:space-between;gap:6px}
+  .insp svg{width:100%;height:auto;background:#FAFAF8;border-radius:8px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--sub)}
+  .sw{display:inline-block;width:18px;height:3px;vertical-align:middle;margin-right:6px}
+  @media (max-width:700px){ .insp{grid-template-columns:1fr} aside{border-right:0;border-bottom:1px solid var(--line)} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside aria-label="調整">
+    <div>
+      <div class="kicker">WHGTCTL ENGINE × NOTO SANS JP</div>
+      <h1>かなでウェイト合成を試す</h1>
+      <p class="note">Noto Sans JP Regular のひらがな・カタカナから、別ウェイトを合成します。比較に本物の Thin / Bold / Black を重ねられます。</p>
+    </div>
+
+    <div class="sec">
+      <h2>文字セット</h2>
+      <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="文字セット">
+        <button type="button" data-set="hira" aria-pressed="true">ひらがな</button>
+        <button type="button" data-set="kata" aria-pressed="false">カタカナ</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h2>比較する本物のウェイト</h2>
+      <div class="seg" style="grid-template-columns:repeat(4,minmax(0,1fr))" role="group" aria-label="比較するウェイト">
+        <button type="button" data-cmp="none" aria-pressed="false">なし</button>
+        <button type="button" data-cmp="Thin" aria-pressed="false">Thin</button>
+        <button type="button" data-cmp="Bold" aria-pressed="true">Bold</button>
+        <button type="button" data-cmp="Black" aria-pressed="false">Black</button>
+      </div>
+      <button type="button" class="btn" id="match">このウェイトの太さに合わせる</button>
+      <label class="chk"><input type="checkbox" id="showCmp" checked>本物の輪郭を重ねる</label>
+    </div>
+
+    <div id="sliders"></div>
+
+    <div class="sec">
+      <label class="chk"><input type="checkbox" id="showAnc" checked>拡大表示にアンカーを表示</label>
+      <button type="button" class="btn ghost" id="reset">リセット</button>
+    </div>
+    <p class="note">フォント：Noto Sans JP（SIL Open Font License 1.1）。ページ内の輪郭データはこのフォントから取り出したものです。</p>
+  </aside>
+
+  <main>
+    <section class="card" aria-live="polite">
+      <div class="bar">
+        <div class="stats" id="stats"></div>
+        <div class="legend">
+          <span><span class="sw" style="background:var(--ink)"></span>合成（Regular から）</span>
+          <span><span class="sw" style="background:var(--cmp)"></span>本物</span>
+        </div>
+      </div>
+      <div class="progress" id="prog" style="margin-top:12px"><div></div></div>
+      <div class="note" id="progText" style="margin-top:6px"></div>
+    </section>
+
+    <section class="card">
+      <div class="insp" id="insp"></div>
+    </section>
+
+    <section class="card">
+      <div class="grid" id="grid"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+var FONTS = /*__FONTS__*/null;
+</script>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__LOADER__*/
+</script>
+<script>
+(function(){
+  var S = 700 / (FONT_M.ft - FONT_M.fb);
+  var MK = { ft:700, fb:0, mid:350, band:50, spanK:4 };
+  var CHARS = { hira:[], kata:[] };
+  Object.keys(FONTS.Regular).forEach(function(ch){ (ch.charCodeAt(0) < 0x30A0 ? CHARS.hira : CHARS.kata).push(ch); });
+
+  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, os:0, oc:0, prec:2 };
+  var SL = [
+    { t:'ウェイト', items:[
+      ['W','縦画の太さ（Regular の StdVW 比）',30,220,'%'],
+      ['mg','カウンター保護（最小の空き）',0,80,'%'],
+      ['cp','カウンター保持（字幅で吸収）',0,100,'%'] ]},
+    { t:'太さの均一化', items:[
+      ['uni','揃える強さ',0,100,'%'],
+      ['tol','揃える範囲（基準からのずれ）',5,80,'%'] ]},
+    { t:'縦横の比率', items:[
+      ['ratio','横画 / 縦画',30,130,'%'],
+      ['dg','斜画を細く',0,30,'%'] ]},
+    { t:'光学補正・精度', items:[
+      ['os','オーバーシュート',0,30,'u'],
+      ['oc','光学的中心（中央の横画）',0,40,'u'],
+      ['prec','曲線の許容誤差',1,8,'u'] ]}
+  ];
+  var P = {}; for (var k in DEF) P[k] = DEF[k];
+  var state = { set:'hira', cmp:'Bold', showCmp:true, showAnc:true, sel:null };
+  var SETS = {}, CMPST = {}, busy = false;
+
+  /* ---------- UI: sliders ---------- */
+  var sw = document.getElementById('sliders'), inputs = {};
+  SL.forEach(function(sec){
+    var d = document.createElement('div'); d.className = 'sec';
+    d.innerHTML = '<h2>' + sec.t + '</h2>';
+    sec.items.forEach(function(it){
+      var id = 'sl-' + it[0], r = document.createElement('div'); r.className = 'row';
+      r.innerHTML = '<div class="lab"><label for="' + id + '">' + it[1] + '</label><span class="val" id="' + id + '-v"></span></div>' +
+        '<input type="range" id="' + id + '" min="' + it[2] + '" max="' + it[3] + '" step="1">';
+      d.appendChild(r);
+      var inp = r.querySelector('input'), val = r.querySelector('.val');
+      inputs[it[0]] = { inp:inp, val:val, unit:it[4] };
+      inp.addEventListener('input', function(){ P[it[0]] = +inp.value; val.textContent = inp.value + it[4]; schedule(true); });
+      inp.addEventListener('change', function(){ schedule(false); });
+    });
+    sw.appendChild(d);
+  });
+  function syncSliders(){ Object.keys(inputs).forEach(function(k){ inputs[k].inp.value = P[k]; inputs[k].val.textContent = P[k] + inputs[k].unit; }); }
+  syncSliders();
+
+  function press(attr, v){ document.querySelectorAll('[data-' + attr + ']').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-' + attr) === v ? 'true' : 'false'); }); }
+  document.querySelectorAll('[data-set]').forEach(function(b){ b.addEventListener('click', function(){ state.set = b.getAttribute('data-set'); state.sel = null; press('set', state.set); ensureSet(state.set, function(){ renderAll(); }); }); });
+  document.querySelectorAll('[data-cmp]').forEach(function(b){ b.addEventListener('click', function(){ state.cmp = b.getAttribute('data-cmp'); press('cmp', state.cmp); document.getElementById('match').disabled = state.cmp === 'none'; renderAll(); }); });
+  document.getElementById('showCmp').addEventListener('change', function(e){ state.showCmp = e.target.checked; renderAll(); });
+  document.getElementById('showAnc').addEventListener('change', function(e){ state.showAnc = e.target.checked; renderInspector(); });
+  document.getElementById('reset').addEventListener('click', function(){ for (var k in DEF) P[k] = DEF[k]; var st = SETS[state.set]; if (st && st.ST) P.ratio = Math.round(st.ST.ratio * 100); syncSliders(); renderAll(); });
+  document.getElementById('match').addEventListener('click', function(){
+    if (state.cmp === 'none') return;
+    ensureCmpStems(state.cmp, state.set, function(T){
+      var st = SETS[state.set].ST;
+      P.W = Math.round(T.V / st.V * 100); P.ratio = Math.round(T.ratio * 100);
+      syncSliders(); renderAll();
+    });
+  });
+
+  /* ---------- 解析（分割して進める） ---------- */
+  var prog = document.querySelector('#prog > div'), progText = document.getElementById('progText');
+  function chunked(items, work, done, label){
+    var i = 0; busy = true;
+    (function step(){
+      var t0 = performance.now();
+      while (i < items.length && performance.now() - t0 < 24){ work(items[i], i); i++; }
+      prog.style.width = (i / items.length * 100).toFixed(1) + '%';
+      progText.textContent = label + ' ' + i + ' / ' + items.length;
+      if (i < items.length) setTimeout(step, 0);
+      else { busy = false; progText.textContent = ''; prog.style.width = '0%'; done(); }
+    })();
+  }
+  function analyzeWeight(weight, chars, cb, label){
+    var out = { As:{}, widths:[] };
+    chunked(chars, function(ch){
+      var A = analyzeGlyph(glyphContours(FONTS[weight][ch], S), MK); A.ch = ch;
+      out.As[ch] = A; out.widths = out.widths.concat(glyphVerticalWidths(A));
+    }, function(){
+      var Wm = median(out.widths) || 60;
+      chars.forEach(function(ch){ finishGlyph(out.As[ch], Wm); });
+      out.Wm = Wm; out.ST = computeStems(chars.map(function(ch){ return out.As[ch]; }), Wm);
+      cb(out);
+    }, label);
+  }
+  function ensureSet(set, cb){
+    if (SETS[set]){ cb(); return; }
+    analyzeWeight('Regular', CHARS[set], function(r){
+      SETS[set] = r; r.cache = {};
+      if (set === 'hira' || !SETS.hira) { P.ratio = Math.round(r.ST.ratio * 100); DEF.ratio = P.ratio; syncSliders(); }
+      cb();
+    }, 'Regular を解析中（' + (set === 'hira' ? 'ひらがな' : 'カタカナ') + '）');
+  }
+  function ensureCmpStems(weight, set, cb){
+    var key = weight + ':' + set;
+    if (CMPST[key]){ cb(CMPST[key]); return; }
+    analyzeWeight(weight, CHARS[set], function(r){ CMPST[key] = r.ST; cb(r.ST); }, weight + ' の標準ステムを測定中');
+  }
+
+  /* ---------- 描画 ---------- */
+  var VB = '-430 -90 860 880';
+  function pathOf(C){
+    var X = function(v){ return v[0].toFixed(1); }, Y = function(v){ return (700 - v[1]).toFixed(1); };
+    return C.map(function(sg){
+      var d = 'M' + X(sg[0].a) + ' ' + Y(sg[0].a);
+      sg.forEach(function(g){ d += g.line ? 'L' + X(g.b) + ' ' + Y(g.b) : 'C' + X(g.c1) + ' ' + Y(g.c1) + ' ' + X(g.c2) + ' ' + Y(g.c2) + ' ' + X(g.b) + ' ' + Y(g.b); });
+      return d + 'Z';
+    }).join('');
+  }
+  var rawCache = {};
+  function rawContours(weight, ch){ var k = weight + ch; if (!rawCache[k]) rawCache[k] = glyphContours(FONTS[weight][ch], S); return rawCache[k]; }
+  function inkArea(C){ return C.reduce(function(t, sg){ return t + polyArea(flattenSegs(sg, 12)); }, 0); }
+  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, os:P.os, oc:P.oc, prec:P.prec }; }
+  function sig(){ return JSON.stringify(P); }
+  function synth(ch){
+    var st = SETS[state.set], key = sig();
+    if (st.cacheKey !== key){ st.cache = {}; st.cacheKey = key; }
+    if (!st.cache[ch]){ var C = deformGlyph(st.As[ch], st.ST, params()); st.cache[ch] = { C:C, d:pathOf(C), n:C.reduce(function(t, s){ return t + s.length; }, 0), area:null }; }
+    return st.cache[ch];
+  }
+  function renderGrid(){
+    var st = SETS[state.set]; if (!st) return;
+    var g = document.getElementById('grid'), html = '', cmpOn = state.cmp !== 'none' && state.showCmp;
+    CHARS[state.set].forEach(function(ch){
+      var r = synth(ch), cmp = cmpOn ? '<path d="' + pathOf(rawContours(state.cmp, ch)) + '" fill="none" stroke="var(--cmp)" stroke-width="7"/>' : '';
+      html += '<button type="button" class="cell" data-ch="' + ch + '" aria-pressed="' + (state.sel === ch) + '" aria-label="' + ch + '">' +
+        '<svg viewBox="' + VB + '" aria-hidden="true"><path d="' + r.d + '" fill="var(--ink)"/>' + cmp + '</svg></button>';
+    });
+    g.innerHTML = html;
+    g.querySelectorAll('.cell').forEach(function(b){ b.addEventListener('click', function(){ state.sel = b.getAttribute('data-ch'); g.querySelectorAll('.cell').forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); renderInspector(); }); });
+  }
+  function anchorsSvg(C){
+    var d = '', h = '';
+    C.forEach(function(sg){ sg.forEach(function(g){
+      var x = g.a[0], y = 700 - g.a[1];
+      d += 'M' + (x - 7).toFixed(1) + ' ' + (y - 7).toFixed(1) + 'h14v14h-14Z';
+      if (!g.line) h += 'M' + g.a[0].toFixed(1) + ' ' + (700 - g.a[1]).toFixed(1) + 'L' + g.c1[0].toFixed(1) + ' ' + (700 - g.c1[1]).toFixed(1) + 'M' + g.b[0].toFixed(1) + ' ' + (700 - g.b[1]).toFixed(1) + 'L' + g.c2[0].toFixed(1) + ' ' + (700 - g.c2[1]).toFixed(1);
+    }); });
+    return '<path d="' + h + '" stroke="#7FA7EE" stroke-width="2.5" fill="none"/><path d="' + d + '" fill="#fff" stroke="var(--accent)" stroke-width="3"/>';
+  }
+  function metricLines(){
+    var y1 = 0, y2 = 700, y3 = 700 - (-FONT_M.fb) * S;
+    return '<line x1="-430" x2="430" y1="' + y1 + '" y2="' + y1 + '" stroke="#C9C5BB" stroke-width="2" stroke-dasharray="8 8"/>' +
+           '<line x1="-430" x2="430" y1="' + y2 + '" y2="' + y2 + '" stroke="#C9C5BB" stroke-width="2" stroke-dasharray="8 8"/>' +
+           '<line x1="-430" x2="430" y1="' + y3 + '" y2="' + y3 + '" stroke="#E3DFD6" stroke-width="2"/>';
+  }
+  function renderInspector(){
+    var st = SETS[state.set]; if (!st) return;
+    var ch = state.sel || CHARS[state.set][0], A = st.As[ch], r = synth(ch);
+    var inN = A.C.reduce(function(t, s){ return t + s.length; }, 0), orgN = FONTS.Regular[ch].c.reduce(function(t, c){ return t + c.length - 1; }, 0);
+    var html = '<figure><svg viewBox="' + VB + '" role="img" aria-label="元の Regular の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rawContours('Regular', ch)) + '" fill="var(--ghost)"/></svg>' +
+      '<figcaption><span>元（Regular）</span><span>アンカー ' + orgN + '</span></figcaption></figure>';
+    html += '<figure><svg viewBox="' + VB + '" role="img" aria-label="合成した ' + ch + '">' + metricLines() + '<path d="' + r.d + '" fill="var(--ink)"/>' + (state.showAnc ? anchorsSvg(r.C) : '') + '</svg>' +
+      '<figcaption><span>合成</span><span>アンカー ' + orgN + ' → ' + r.n + '</span></figcaption></figure>';
+    if (state.cmp !== 'none'){
+      var rc = rawContours(state.cmp, ch);
+      if (r.area === null) r.area = inkArea(r.C);
+      var ratio = r.area / inkArea(rc) * 100;
+      html += '<figure><svg viewBox="' + VB + '" role="img" aria-label="本物の ' + state.cmp + ' の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rc) + '" fill="var(--cmp)" fill-opacity="0.9"/><path d="' + r.d + '" fill="none" stroke="var(--ink)" stroke-width="3"/></svg>' +
+        '<figcaption><span>本物（' + state.cmp + '）＋合成の輪郭</span><span>黒み ' + ratio.toFixed(1) + '%</span></figcaption></figure>';
+    } else html += '<figure><svg viewBox="' + VB + '" aria-hidden="true">' + metricLines() + '</svg><figcaption><span>比較なし</span><span></span></figcaption></figure>';
+    document.getElementById('insp').innerHTML = html;
+  }
+  function renderStats(){
+    var st = SETS[state.set]; if (!st) return;
+    var u = function(v){ return (v / S).toFixed(1); };
+    var Vt = st.ST.V * P.W / 100, Ht = Vt * P.ratio / 100;
+    var chips = ['Regular StdVW ' + u(st.ST.V) + ' / StdHW ' + u(st.ST.H), '合成 縦 ' + u(Vt) + ' / 横 ' + u(Ht)];
+    var key = state.cmp + ':' + state.set;
+    if (state.cmp !== 'none' && CMPST[key]) chips.push(state.cmp + ' 実測 ' + u(CMPST[key].V) + ' / ' + u(CMPST[key].H));
+    if (state.cmp !== 'none'){
+      var rs = CHARS[state.set].map(function(ch){ var r = synth(ch); if (r.area === null) r.area = inkArea(r.C); return r.area / inkArea(rawContours(state.cmp, ch)); });
+      chips.push('黒み（合成/本物）中央値 ' + (median(rs) * 100).toFixed(1) + '%');
+    }
+    var tin = 0, tout = 0;
+    CHARS[state.set].forEach(function(ch){ tin += FONTS.Regular[ch].c.reduce(function(t, c){ return t + c.length - 1; }, 0); tout += synth(ch).n; });
+    chips.push('アンカー ' + tin + ' → ' + tout);
+    document.getElementById('stats').innerHTML = chips.map(function(c){ return '<span class="chip">' + c + '</span>'; }).join('') + '<span class="chip">単位：フォント単位（1000/em）</span>';
+  }
+  function renderAll(){ renderInspector(); renderGrid(); renderStats(); }
+  var pend = null, pendGrid = null;
+  function schedule(quick){
+    if (!SETS[state.set]) return;
+    if (pend) cancelAnimationFrame(pend);
+    pend = requestAnimationFrame(function(){ pend = null; renderInspector(); });
+    if (pendGrid) clearTimeout(pendGrid);
+    pendGrid = setTimeout(function(){ pendGrid = null; renderGrid(); renderStats(); }, quick ? 220 : 0);
+  }
+
+  document.getElementById('match').disabled = false;
+  ensureSet('hira', function(){
+    renderAll();
+    ensureCmpStems('Bold', 'hira', function(T){ var st = SETS.hira.ST; P.W = Math.round(T.V / st.V * 100); P.ratio = Math.round(T.ratio * 100); syncSliders(); renderAll(); });
+  });
+})();
+</script>
+</body>
+</html>

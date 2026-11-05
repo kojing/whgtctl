@@ -1,5 +1,5 @@
 ﻿/*
-  OpticalCorrection.jsx  v0.1
+  OpticalCorrection.jsx  v0.2
   Illustrator 用：塗りパスで組んだ文字のウェイト変更・太さの均一化・縦横比・光学補正
 
   使い方
@@ -103,11 +103,17 @@ function rayExit(cs, edges, qx, qy, nx, ny) {
   for (var h = 0; h < hits.length; h++) { w += hits[h][1]; if (w === 0) return hits[h][0]; }
   return 1200;
 }
+// 外側の空き：向かい合う辺（レイにほぼ直交する辺）に当たるまでの距離。内角の隣の辺はかすめるだけなので数えない
 function rayEnter(cs, edges, qx, qy, nx, ny) {
   var w = windingAt(cs, qx, qy); if (w !== 0) return 0;
-  var hits = rayHits(edges, qx, qy, nx, ny);
-  for (var h = 0; h < hits.length; h++) { w += hits[h][1]; if (w !== 0) return hits[h][0]; }
-  return 1000;
+  var best = 1000;
+  for (var k = 0; k < edges.length; k++) {
+    var e = edges[k], ex = e[2] - e[0], ey = e[3] - e[1], den = nx * ey - ny * ex, el = hyp(ex, ey);
+    if (Math.abs(den) < 1e-9 || el < 1e-9) continue;
+    var ax = e[0] - qx, ay = e[1] - qy, t = (ax * ey - ay * ex) / den, u = (ax * ny - ay * nx) / den;
+    if (t > 1e-6 && u >= 0 && u < 1 && t < best && Math.abs(den) / el > 0.6) best = t;
+  }
+  return best;
 }
 function smoothstepCos(d, R) { return d >= R ? 0 : (1 + Math.cos(Math.PI * d / R)) / 2; }
 
@@ -297,7 +303,7 @@ function segDFun(S, M, p) {
   if (S.onMetric) return constF(0);
   var k = S.opp ? 2 : 1;
   if (S.g.line) return constF(dFrom(S.w, S.gap, S.n0[0], S.n0[1], k, M, p));
-  var ds = S.sm.map(function (s) { return { t: s.t, d: dFrom(s.wf, s.gf, s.nx, s.ny, 1, M, p) }; });
+  var ds = S.dsm || S.sm.map(function (s) { return { t: s.t, d: dFrom(s.wf, s.gf, s.nx, s.ny, 1, M, p) }; });
   var part = function (lo, hi) { return median(ds.filter(function (o) { return o.t >= lo && o.t <= hi; }).map(function (o) { return o.d; })); };
   var d0 = part(0, 0.3), dm = part(0.35, 0.65), d1 = part(0.7, 1);
   return function (t) { var u = 1 - t; return d0 * u * (1 - 2 * t) + dm * 4 * t * u + d1 * t * (2 * t - 1); };
@@ -307,27 +313,44 @@ function lineX(p1, d1, p2, d2) {
   var t = ((p2[0] - p1[0]) * d2[1] - (p2[1] - p1[1]) * d2[0]) / den; return [p1[0] + d1[0] * t, p1[1] + d1[1] * t];
 }
 function leftN(v) { var n = nrm(v); return [-n[1], n[0]]; }
+// 曲線のオフセット：真のオフセット点列に、端点と端の接線方向を固定した 3 次ベジェを最小二乗で当てはめる（Schneider 法）
+function fitFixedTangents(Q, us, a2, b2, t0, t1) {
+  // B(u) = a2*B0 + (a2 + al1*t0)*B1 + (b2 + al2*t1)*B2 + b2*B3, t1 は b2 から内側へ向く単位ベクトル
+  var C00 = 0, C01 = 0, C11 = 0, X0 = 0, X1 = 0;
+  for (var i = 0; i < Q.length; i++) {
+    var u = us[i], v = 1 - u, B0 = v * v * v, B1 = 3 * u * v * v, B2 = 3 * u * u * v, B3 = u * u * u;
+    var A1 = [t0[0] * B1, t0[1] * B1], A2 = [t1[0] * B2, t1[1] * B2];
+    C00 += A1[0] * A1[0] + A1[1] * A1[1]; C01 += A1[0] * A2[0] + A1[1] * A2[1]; C11 += A2[0] * A2[0] + A2[1] * A2[1];
+    var tx = Q[i][0] - (a2[0] * (B0 + B1) + b2[0] * (B2 + B3)), ty = Q[i][1] - (a2[1] * (B0 + B1) + b2[1] * (B2 + B3));
+    X0 += A1[0] * tx + A1[1] * ty; X1 += A2[0] * tx + A2[1] * ty;
+  }
+  var det = C00 * C11 - C01 * C01, chord = hyp(b2[0] - a2[0], b2[1] - a2[1]), al1, al2;
+  if (Math.abs(det) > 1e-9) { al1 = (X0 * C11 - X1 * C01) / det; al2 = (C00 * X1 - C01 * X0) / det; }
+  else { al1 = al2 = chord / 3; }
+  var eps = 1e-3 * chord;
+  if (!(al1 > eps) || !(al2 > eps) || al1 > 2 * chord || al2 > 2 * chord) { al1 = al2 = chord / 3; }
+  return { a: a2, c1: [a2[0] + t0[0] * al1, a2[1] + t0[1] * al1], c2: [b2[0] + t1[0] * al2, b2[1] + t1[1] * al2], b: b2, line: false };
+}
+function distToCurve(cand, Q) {
+  var best = 1e9, prevR = bez(cand, 0);
+  for (var k = 1; k <= 32; k++) {
+    var R = bez(cand, k / 32), sx = R[0] - prevR[0], sy = R[1] - prevR[1], sl = sx * sx + sy * sy;
+    var u = sl > 0 ? Math.max(0, Math.min(1, ((Q[0] - prevR[0]) * sx + (Q[1] - prevR[1]) * sy) / sl)) : 0;
+    var dd = hyp(prevR[0] + sx * u - Q[0], prevR[1] + sy * u - Q[1]); if (dd < best) best = dd; prevR = R;
+  }
+  return best;
+}
 function offsetCurve(g, a2, b2, D, tol, depth, out) {
-  var e1 = [g.c1[0] - g.a[0], g.c1[1] - g.a[1]], e2 = [g.c2[0] - g.c1[0], g.c2[1] - g.c1[1]], e3 = [g.b[0] - g.c2[0], g.b[1] - g.c2[1]];
-  var l1 = hyp(e1[0], e1[1]), l2 = hyp(e2[0], e2[1]), l3 = hyp(e3[0], e3[1]), c1 = null, c2 = null;
-  if (l1 > 1e-6 && l2 > 1e-6 && l3 > 1e-6) {
-    var n2 = leftN(e2), dm = D(0.5), q = [g.c1[0] + n2[0] * dm, g.c1[1] + n2[1] * dm];
-    c1 = lineX(a2, e1, q, e2); c2 = lineX(b2, e3, q, e2);
-    if (c1 && hyp(c1[0] - a2[0], c1[1] - a2[1]) > 3 * l1 + 20) c1 = null;
-    if (c2 && hyp(c2[0] - b2[0], c2[1] - b2[1]) > 3 * l3 + 20) c2 = null;
+  var N = 12, Q = [], us = [], L = 0, prev = a2;
+  for (var j = 1; j < N; j++) {
+    var t = j / N, P = bez(g, t), T = segTan(g, t), d = D(t), q = [P[0] - T[1] * d, P[1] + T[0] * d];
+    L += hyp(q[0] - prev[0], q[1] - prev[1]); Q.push(q); us.push(L); prev = q;
   }
-  if (!c1) c1 = [g.c1[0] + (a2[0] - g.a[0]), g.c1[1] + (a2[1] - g.a[1])];
-  if (!c2) c2 = [g.c2[0] + (b2[0] - g.b[0]), g.c2[1] + (b2[1] - g.b[1])];
-  var cand = { a: a2, c1: c1, c2: c2, b: b2, line: false }, err = 0;
-  for (var j = 1; j < 8; j++) {
-    var t = j / 8, P = bez(g, t), T = segTan(g, t), d = D(t), Q = [P[0] - T[1] * d, P[1] + T[0] * d], best = 1e9, prevR = bez(cand, 0);
-    for (var k = 1; k <= 32; k++) {
-      var R = bez(cand, k / 32), sx = R[0] - prevR[0], sy = R[1] - prevR[1], sl = sx * sx + sy * sy;
-      var u = sl > 0 ? Math.max(0, Math.min(1, ((Q[0] - prevR[0]) * sx + (Q[1] - prevR[1]) * sy) / sl)) : 0;
-      var dd = hyp(prevR[0] + sx * u - Q[0], prevR[1] + sy * u - Q[1]); if (dd < best) best = dd; prevR = R;
-    }
-    if (best > err) err = best;
-  }
+  L += hyp(b2[0] - prev[0], b2[1] - prev[1]);
+  for (var j2 = 0; j2 < us.length; j2++) us[j2] = L > 0 ? us[j2] / L : (j2 + 1) / N;
+  var t0 = startTan(g), te = endTan(g), t1 = [-te[0], -te[1]];
+  var cand = fitFixedTangents(Q, us, a2, b2, t0, t1), err = 0;
+  for (var k = 0; k < Q.length; k++) { var e = distToCurve(cand, Q[k]); if (e > err) err = e; }
   if (err <= tol || depth >= 2) { out.push(cand); return; }
   var sp = splitBez(g, 0.5), Pm = sp[0].b, Tm = segTan(g, 0.5), dmid = D(0.5), M2 = [Pm[0] - Tm[1] * dmid, Pm[1] + Tm[0] * dmid];
   offsetCurve(sp[0], a2, M2, function (t) { return D(t / 2); }, tol, depth + 1, out);
@@ -335,6 +358,34 @@ function offsetCurve(g, a2, b2, D, tol, depth, out) {
 }
 function deformGlyph(A, ST, p) {
   var M = stemModel(ST, p), m = A.m;
+  // なめらかにつながる曲線の連なりでは、区間をまたいでオフセット量をならす（区間ごとの食い違いで波打たないように）
+  var sw = p.smooth === undefined ? 5 : p.smooth;
+  A.SEG.forEach(function (segs) {
+    var n = segs.length, chain = [], used = [];
+    segs.forEach(function (S) { S.dsm = null; });
+    if (!sw) return;
+    var ok = function (S) { return !S.g.line && !S.hidden && !S.isCap && !S.coincide && !S.onMetric; };
+    var smoothJoin = function (P, N) { return (P.t1[0] * N.t0[0] + P.t1[1] * N.t0[1]) > 0.985; };
+    for (var i = 0; i < n; i++) {
+      if (used[i] || !ok(segs[i])) continue;
+      var st = i, guard = 0;
+      while (guard++ < n) { var pv = (st - 1 + n) % n; if (pv === i || used[pv] || !ok(segs[pv]) || !smoothJoin(segs[pv], segs[st])) break; st = pv; }
+      var run = [], j = st; guard = 0;
+      while (guard++ < n) { run.push(j); used[j] = true; var nx = (j + 1) % n; if (nx === st || used[nx] || !ok(segs[nx]) || !smoothJoin(segs[j], segs[nx])) break; j = nx; }
+      var flat = [];
+      run.forEach(function (si) { var S = segs[si]; S.sm.forEach(function (sm) { flat.push({ S: S, t: sm.t, d: dFrom(sm.wf, sm.gf, sm.nx, sm.ny, 1, M, p) }); }); });
+      var closed = run.length === n;
+      var sm2 = flat.map(function (o, k) {
+        var sum = 0, wsum = 0;
+        for (var q = -sw * 2; q <= sw * 2; q++) {
+          var kk = k + q; if (closed) kk = (kk + flat.length) % flat.length; else if (kk < 0 || kk >= flat.length) continue;
+          var w = Math.exp(-q * q / (2 * sw * sw)); sum += flat[kk].d * w; wsum += w;
+        }
+        return sum / wsum;
+      });
+      flat.forEach(function (o, k) { if (!o.S.dsm) o.S.dsm = []; o.S.dsm.push({ t: o.t, d: sm2[k] }); });
+    }
+  });
   var DF = A.SEG.map(function (segs) { return segs.map(function (S) { return (S.hidden || S.coincide || S.isCap) ? null : segDFun(S, M, p); }); });
   A.SEG.forEach(function (segs, ci) {
     segs.forEach(function (S, si) {
@@ -343,6 +394,28 @@ function deformGlyph(A, ST, p) {
       else DF[ci][si] = constF(0);
     });
   });
+  // 短い辺（つなぎ目の数ユニットの辺など）は自前で測らず、前後の辺から補間する
+  var tinyL = (p.tiny === undefined ? 0.35 : p.tiny) * ST.V;
+  A.SEG.forEach(function (segs, ci) {
+    segs.forEach(function (S, si) {
+      var g = S.g, L = g.line ? hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) : (hyp(g.c1[0] - g.a[0], g.c1[1] - g.a[1]) + hyp(g.c2[0] - g.c1[0], g.c2[1] - g.c1[1]) + hyp(g.b[0] - g.c2[0], g.b[1] - g.c2[1]));
+      S.tiny = (L < tinyL || (S.coincide && !S.follow)) && !S.isCap;
+      if (S.tiny) DF[ci][si] = null;
+    });
+  });
+  A.SEG.forEach(function (segs, ci) {
+    var n = segs.length;
+    for (var pass = 0; pass < 4; pass++) {
+      segs.forEach(function (S, si) {
+        if (!S.tiny || DF[ci][si]) return;
+        var j, pv = null, nx = null;
+        for (j = 1; j < n; j++) { var a = segs[(si - j + n) % n]; if (!a.tiny && !a.isCap && DF[ci][(si - j + n) % n]) { pv = DF[ci][(si - j + n) % n]; break; } }
+        for (j = 1; j < n; j++) { var b = segs[(si + j) % n]; if (!b.tiny && !b.isCap && DF[ci][(si + j) % n]) { nx = DF[ci][(si + j) % n]; break; } }
+        if (pv || nx) { var v0 = pv ? pv(1) : nx(0), v1 = nx ? nx(0) : pv(1); DF[ci][si] = (function (a0, a1) { return function (t) { return a0 + (a1 - a0) * t; }; })(v0, v1); }
+        else if (pass === 3) DF[ci][si] = constF(0);
+      });
+    }
+  });
   A.SEG.forEach(function (segs, ci) {
     var n = segs.length;
     for (var pass = 0; pass < 3; pass++) {
@@ -350,7 +423,7 @@ function deformGlyph(A, ST, p) {
         if (DF[ci][si]) return;
         var pv = DF[ci][(si - 1 + n) % n], nx = DF[ci][(si + 1) % n], vals = [];
         if (pv) vals.push(pv(1)); if (nx) vals.push(nx(0));
-        if (S.g.line) { if (vals.length || pass === 2) DF[ci][si] = constF(0); return; }
+        if (S.g.line) { if (vals.length || pass === 2) { var av = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0; DF[ci][si] = constF(S.isCap ? av * (p.ext === undefined ? 0 : p.ext) : 0); } return; }
         if (vals.length || pass === 2) DF[ci][si] = constF(vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) / vals.length : 0);
       });
     }
@@ -375,14 +448,41 @@ function deformGlyph(A, ST, p) {
         var det = n1[0] * n2[1] - n1[1] * n2[0];
         if (Math.abs(det) > 0.15) {
           v = [(d1 * n2[1] - n1[1] * d2) / det, (n1[0] * d2 - d1 * n2[0]) / det];
-          var lim = 2 * Math.max(Math.abs(d1), Math.abs(d2)) + 0.5, l = hyp(v[0], v[1]); if (l > lim) v = [v[0] / l * lim, v[1] / l * lim];
+          var lim = (p.ml === undefined ? 2 : p.ml) * Math.max(Math.abs(d1), Math.abs(d2)) + 0.5, l = hyp(v[0], v[1]); if (l > lim) v = [v[0] / l * lim, v[1] / l * lim];
         } else { dd = (d1 + d2) / 2; nn = nrm([n1[0] + n2[0], n1[1] + n2[1]]); v = [nn[0] * dd, nn[1] * dd]; }
       } else { dd = (d1 + d2) / 2; nn = nrm([n1[0] + n2[0], n1[1] + n2[1]]); v = [nn[0] * dd, nn[1] * dd]; }
       disp.push([Nx.g.a[0] + v[0], Nx.g.a[1] + v[1]]);
       dAt.push(corner ? null : (d1 + d2) / 2);
     }
+    // 反転した辺（オフセットで向きが逆になった辺）を畳み、前後の辺の延長線の交点でつなぐ＝スワローテール除去
+    var drop = [];
+    for (i = 0; i < n; i++) drop.push(false);
+    for (var it = 0; it < (p.noST ? 0 : 3); it++) {
+      var changed = false;
+      for (i = 0; i < n; i++) {
+        if (drop[i]) continue;
+        var g0 = segs[i].g, a0 = disp[i], b0 = disp[(i + 1) % n];
+        var ox = g0.b[0] - g0.a[0], oy = g0.b[1] - g0.a[1], ol2 = ox * ox + oy * oy;
+        if (ol2 < 1e-6) continue;
+        if ((b0[0] - a0[0]) * ox + (b0[1] - a0[1]) * oy > 0.02 * ol2) continue;
+        var pi = (i - 1 + n) % n, ni = (i + 1) % n, guard = 0;
+        while (drop[pi] && guard++ < n) pi = (pi - 1 + n) % n;
+        guard = 0;
+        while (drop[ni] && guard++ < n) ni = (ni + 1) % n;
+        if (pi === i || ni === i || pi === ni) continue;
+        var X = lineX(disp[i], segs[pi].t1, disp[(i + 1) % n], segs[ni].t0);
+        var mid = [(a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2];
+        if (!X || hyp(X[0] - mid[0], X[1] - mid[1]) > 3 * ST.V) X = mid;
+        drop[i] = true; changed = true;
+        for (var k2 = i; ; k2 = (k2 + 1) % n) { disp[k2] = X; if (k2 === (i + 1) % n) break; }
+        // 畳んだ辺に挟まれた区間の端点もそろえる
+        var q = (i - 1 + n) % n; while (drop[q] && q !== i) { disp[q] = X; q = (q - 1 + n) % n; }
+      }
+      if (!changed) break;
+    }
     var res = [];
     segs.forEach(function (S, i2) {
+      if (drop[i2]) return;
       var a2 = disp[i2], b2 = disp[(i2 + 1) % n];
       if (S.g.line) { res.push({ a: a2, c1: a2, c2: b2, b: b2, line: true }); return; }
       var F = DF[ci][i2], sA = dAt[i2], sB = dAt[(i2 + 1) % n], e0 = sA === null ? 0 : sA - F(0), e1 = sB === null ? 0 : sB - F(1);
@@ -532,7 +632,7 @@ function restoreJob(job) { job.glyphs.forEach(function (G) { G.snaps.forEach(fun
 /* ====================================================================== */
 function runDialog(glyphs) {
   var met = detectMetrics(glyphs), script = 'latin', job = null;
-  var P = { W: 100, uni: 100, tol: 30, ratio: 94, dg: 8, mg: 35, cp: 0, os: 12, oc: 16, prec: 2 };
+  var P = { W: 100, uni: 100, tol: 30, ratio: 94, dg: 8, mg: 35, cp: 0, ext: 50, os: 12, oc: 16, prec: 2 };
   var DEF = {}; for (var k in P) DEF[k] = P[k];
 
   var dlg = new Window('dialog', '光学補正 / ウェイト調整');
@@ -566,6 +666,7 @@ function runDialog(glyphs) {
   addSlider(pw, 'W', '縦画の太さ（元の StdVW 比）', 30, 200, '%');
   addSlider(pw, 'mg', 'カウンター保護（最小の空き）', 0, 80, '%');
   addSlider(pw, 'cp', 'カウンター保持（字幅で吸収）', 0, 100, '%');
+  addSlider(pw, 'ext', '線端の伸び（太った量に対して）', 0, 100, '%');
   var pu = dlg.add('panel', undefined, '太さの均一化'); pu.alignChildren = 'fill';
   addSlider(pu, 'uni', '揃える強さ', 0, 100, '%');
   addSlider(pu, 'tol', '揃える範囲（基準からのずれ）', 5, 80, '%');
@@ -586,7 +687,7 @@ function runDialog(glyphs) {
 
   function setVal(key, v) { P[key] = v; if (sliders[key]) { sliders[key].sl.value = v; sliders[key].et.text = String(v); } }
   function params() {
-    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, os: P.os, oc: P.oc, prec: P.prec };
+    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec };
   }
   var dirty = false;
   function reanalyze() {

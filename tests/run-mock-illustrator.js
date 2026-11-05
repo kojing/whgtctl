@@ -35,7 +35,7 @@ function suite(chars, script, pitch, H) {
     return new Group(ch, items);
   });
   var glyphs = buildJob(groups), job = analyzeJob(glyphs, detectMetrics(glyphs), script);
-  var base = { W: 1, uni: 1, tol: 0.3, ratio: job.ST.ratio, dg: 0.08, mg: 0.35, cp: 0, os: 12, oc: 16, prec: 2 };
+  var base = { W: 1, uni: 1, tol: 0.3, ratio: job.ST.ratio, dg: 0.08, mg: 0.35, cp: 0, ext: 0.5, tiny: 0.35, smooth: 5, os: 12, oc: 16, prec: 2 };
   [['thin', { W: 0.45 }], ['regular', {}], ['black', { W: 1.7 }], ['ratio60', { ratio: 0.6 }]].forEach(function (c) {
     restoreJob(job); var p = {}, k; for (k in base) p[k] = base[k]; for (k in c[1]) p[k] = c[1][k];
     var n = applyJob(job, p); console.log(script, c[0], 'anchors', n); toSvg(glyphs, script + '_' + c[0] + '.svg', pitch, H);
