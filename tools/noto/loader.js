@@ -1,7 +1,8 @@
 var FONT_M = { fb: -74, ft: 834 };
-function glyphContours(G, s) {
+function glyphContours(G, s, fm) {
+  fm = fm || FONT_M;
   var cx = G.adv / 2;
-  var T = function (x, y) { return [(x - cx) * s, (y - FONT_M.fb) * s]; };
+  var T = function (x, y) { return [(x - cx) * s, (y - fm.fb) * s]; };
   var raw = G.c.map(function (c) {
     var segs = [], st = T(c[0][0], c[0][1]), cur = st;
     for (var i = 1; i < c.length; i++) {

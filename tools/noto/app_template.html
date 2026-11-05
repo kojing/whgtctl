@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Noto Sans JP かなでウェイト合成を試す</title>
+<title>Noto Sans JP でウェイト合成を試す</title>
 <style>
   :root{
     --ground:#F4F3EF; --panel:#FFFFFF; --ink:#151515; --sub:#55585E; --line:#DEDBD3;
@@ -56,16 +56,18 @@
   <aside aria-label="調整">
     <div>
       <div class="kicker">WHGTCTL ENGINE × NOTO SANS JP</div>
-      <h1>かなでウェイト合成を試す</h1>
-      <p class="note">Noto Sans JP Regular のひらがな・カタカナから、別ウェイトを合成します。比較に本物の Thin / Bold / Black を重ねられます。</p>
+      <h1>Noto Sans JP でウェイト合成を試す</h1>
+      <p class="note">Noto Sans JP Regular のひらがな・カタカナ・英数字から、別ウェイトを合成します。比較に本物の Thin / Bold / Black を重ねられます。</p>
     </div>
 
     <div class="sec">
       <h2>文字セット</h2>
-      <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="文字セット">
+      <div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))" role="group" aria-label="文字セット">
         <button type="button" data-set="hira" aria-pressed="true">ひらがな</button>
         <button type="button" data-set="kata" aria-pressed="false">カタカナ</button>
+        <button type="button" data-set="latn" aria-pressed="false">英数字</button>
       </div>
+      <label class="chk"><input type="checkbox" id="compat" checked>頂点数を揃える（ウェイト間で互換）</label>
     </div>
 
     <div class="sec">
@@ -123,17 +125,23 @@ var FONTS = /*__FONTS__*/null;
 </script>
 <script>
 (function(){
-  var S = 700 / (FONT_M.ft - FONT_M.fb);
-  var MK = { ft:700, fb:0, mid:350, band:50, spanK:4 };
-  var CHARS = { hira:[], kata:[] };
-  Object.keys(FONTS.Regular).forEach(function(ch){ (ch.charCodeAt(0) < 0x30A0 ? CHARS.hira : CHARS.kata).push(ch); });
+  var SETM = {
+    hira: { fm:{ fb:-74, ft:834 }, m:{ ft:700, fb:0, mid:350, band:50, spanK:4 } },
+    kata: { fm:{ fb:-74, ft:834 }, m:{ ft:700, fb:0, mid:350, band:50, spanK:4 } },
+    latn: { fm:{ fb:0, ft:733 },   m:{ ft:700, fb:0, mid:350, band:4,  spanK:2 } }
+  };
+  Object.keys(SETM).forEach(function(k){ SETM[k].S = 700 / (SETM[k].fm.ft - SETM[k].fm.fb); });
+  var CHARS = { hira:[], kata:[], latn:[] };
+  Object.keys(FONTS.Regular).forEach(function(ch){ var c = ch.charCodeAt(0); (c < 0x3000 ? CHARS.latn : c < 0x30A0 ? CHARS.hira : CHARS.kata).push(ch); });
+  function setOfChar(ch){ var c = ch.charCodeAt(0); return c < 0x3000 ? 'latn' : c < 0x30A0 ? 'hira' : 'kata'; }
 
-  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, os:0, oc:0, prec:2 };
+  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, ext:50, os:0, oc:0, prec:2 };
   var SL = [
     { t:'ウェイト', items:[
       ['W','縦画の太さ（Regular の StdVW 比）',30,220,'%'],
       ['mg','カウンター保護（最小の空き）',0,80,'%'],
-      ['cp','カウンター保持（字幅で吸収）',0,100,'%'] ]},
+      ['cp','カウンター保持（字幅で吸収）',0,100,'%'],
+      ['ext','線端の伸び（太った量に対して）',0,100,'%'] ]},
     { t:'太さの均一化', items:[
       ['uni','揃える強さ',0,100,'%'],
       ['tol','揃える範囲（基準からのずれ）',5,80,'%'] ]},
@@ -146,7 +154,7 @@ var FONTS = /*__FONTS__*/null;
       ['prec','曲線の許容誤差',1,8,'u'] ]}
   ];
   var P = {}; for (var k in DEF) P[k] = DEF[k];
-  var state = { set:'hira', cmp:'Bold', showCmp:true, showAnc:true, sel:null };
+  var state = { set:'hira', cmp:'Bold', showCmp:true, showAnc:true, sel:null, compat:true };
   var SETS = {}, CMPST = {}, busy = false;
 
   /* ---------- UI: sliders ---------- */
@@ -174,11 +182,12 @@ var FONTS = /*__FONTS__*/null;
   document.querySelectorAll('[data-cmp]').forEach(function(b){ b.addEventListener('click', function(){ state.cmp = b.getAttribute('data-cmp'); press('cmp', state.cmp); document.getElementById('match').disabled = state.cmp === 'none'; renderAll(); }); });
   document.getElementById('showCmp').addEventListener('change', function(e){ state.showCmp = e.target.checked; renderAll(); });
   document.getElementById('showAnc').addEventListener('change', function(e){ state.showAnc = e.target.checked; renderInspector(); });
-  document.getElementById('reset').addEventListener('click', function(){ for (var k in DEF) P[k] = DEF[k]; var st = SETS[state.set]; if (st && st.ST) P.ratio = Math.round(st.ST.ratio * 100); syncSliders(); renderAll(); });
+  document.getElementById('compat').addEventListener('change', function(e){ state.compat = e.target.checked; ensureSet(state.set, function(){ renderAll(); }); });
+  document.getElementById('reset').addEventListener('click', function(){ for (var k in DEF) P[k] = DEF[k]; var st = curSet(); if (st && st.ST) P.ratio = Math.round(st.ST.ratio * 100); syncSliders(); renderAll(); });
   document.getElementById('match').addEventListener('click', function(){
     if (state.cmp === 'none') return;
     ensureCmpStems(state.cmp, state.set, function(T){
-      var st = SETS[state.set].ST;
+      var st = curSet().ST;
       P.W = Math.round(T.V / st.V * 100); P.ratio = Math.round(T.ratio * 100);
       syncSliders(); renderAll();
     });
@@ -200,7 +209,8 @@ var FONTS = /*__FONTS__*/null;
   function analyzeWeight(weight, chars, cb, label){
     var out = { As:{}, widths:[] };
     chunked(chars, function(ch){
-      var A = analyzeGlyph(glyphContours(FONTS[weight][ch], S), MK); A.ch = ch;
+      var sm = SETM[setOfChar(ch)];
+      var A = analyzeGlyph(glyphContours(FONTS[weight][ch], sm.S, sm.fm), sm.m, { compat: weight === 'Regular' && state.compat }); A.ch = ch;
       out.As[ch] = A; out.widths = out.widths.concat(glyphVerticalWidths(A));
     }, function(){
       var Wm = median(out.widths) || 60;
@@ -209,13 +219,16 @@ var FONTS = /*__FONTS__*/null;
       cb(out);
     }, label);
   }
+  function setKey(set){ return set + (state.compat ? ':c' : ':n'); }
+  function curSet(){ return SETS[setKey(state.set)]; }
   function ensureSet(set, cb){
-    if (SETS[set]){ cb(); return; }
+    var key = setKey(set);
+    if (SETS[key]){ cb(); return; }
     analyzeWeight('Regular', CHARS[set], function(r){
-      SETS[set] = r; r.cache = {};
-      if (set === 'hira' || !SETS.hira) { P.ratio = Math.round(r.ST.ratio * 100); DEF.ratio = P.ratio; syncSliders(); }
+      SETS[key] = r; r.cache = {};
+      if (!state.ratioSet) { P.ratio = Math.round(r.ST.ratio * 100); DEF.ratio = P.ratio; syncSliders(); state.ratioSet = true; }
       cb();
-    }, 'Regular を解析中（' + (set === 'hira' ? 'ひらがな' : 'カタカナ') + '）');
+    }, 'Regular を解析中（' + ({ hira:'ひらがな', kata:'カタカナ', latn:'英数字' })[set] + '）');
   }
   function ensureCmpStems(weight, set, cb){
     var key = weight + ':' + set;
@@ -224,7 +237,7 @@ var FONTS = /*__FONTS__*/null;
   }
 
   /* ---------- 描画 ---------- */
-  var VB = '-430 -90 860 880';
+  var VBS = { hira:'-430 -90 860 880', kata:'-430 -90 860 880', latn:'-430 -60 860 1080' };
   function pathOf(C){
     var X = function(v){ return v[0].toFixed(1); }, Y = function(v){ return (700 - v[1]).toFixed(1); };
     return C.map(function(sg){
@@ -234,23 +247,23 @@ var FONTS = /*__FONTS__*/null;
     }).join('');
   }
   var rawCache = {};
-  function rawContours(weight, ch){ var k = weight + ch; if (!rawCache[k]) rawCache[k] = glyphContours(FONTS[weight][ch], S); return rawCache[k]; }
+  function rawContours(weight, ch){ var k = weight + ch; if (!rawCache[k]){ var sm = SETM[setOfChar(ch)]; rawCache[k] = glyphContours(FONTS[weight][ch], sm.S, sm.fm); } return rawCache[k]; }
   function inkArea(C){ return C.reduce(function(t, sg){ return t + polyArea(flattenSegs(sg, 12)); }, 0); }
-  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, os:P.os, oc:P.oc, prec:P.prec }; }
-  function sig(){ return JSON.stringify(P); }
+  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, ext:P.ext/100, tiny:0.35, smooth:5, os:P.os, oc:P.oc, prec:P.prec, compat:state.compat }; }
+  function sig(){ return JSON.stringify(P) + state.compat; }
   function synth(ch){
-    var st = SETS[state.set], key = sig();
+    var st = curSet(), key = sig();
     if (st.cacheKey !== key){ st.cache = {}; st.cacheKey = key; }
     if (!st.cache[ch]){ var C = deformGlyph(st.As[ch], st.ST, params()); st.cache[ch] = { C:C, d:pathOf(C), n:C.reduce(function(t, s){ return t + s.length; }, 0), area:null }; }
     return st.cache[ch];
   }
   function renderGrid(){
-    var st = SETS[state.set]; if (!st) return;
+    var st = curSet(); if (!st) return;
     var g = document.getElementById('grid'), html = '', cmpOn = state.cmp !== 'none' && state.showCmp;
     CHARS[state.set].forEach(function(ch){
       var r = synth(ch), cmp = cmpOn ? '<path d="' + pathOf(rawContours(state.cmp, ch)) + '" fill="none" stroke="var(--cmp)" stroke-width="7"/>' : '';
       html += '<button type="button" class="cell" data-ch="' + ch + '" aria-pressed="' + (state.sel === ch) + '" aria-label="' + ch + '">' +
-        '<svg viewBox="' + VB + '" aria-hidden="true"><path d="' + r.d + '" fill="var(--ink)"/>' + cmp + '</svg></button>';
+        '<svg viewBox="' + VBS[state.set] + '" aria-hidden="true"><path d="' + r.d + '" fill="var(--ink)"/>' + cmp + '</svg></button>';
     });
     g.innerHTML = html;
     g.querySelectorAll('.cell').forEach(function(b){ b.addEventListener('click', function(){ state.sel = b.getAttribute('data-ch'); g.querySelectorAll('.cell').forEach(function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); renderInspector(); }); });
@@ -265,31 +278,31 @@ var FONTS = /*__FONTS__*/null;
     return '<path d="' + h + '" stroke="#7FA7EE" stroke-width="2.5" fill="none"/><path d="' + d + '" fill="#fff" stroke="var(--accent)" stroke-width="3"/>';
   }
   function metricLines(){
-    var y1 = 0, y2 = 700, y3 = 700 - (-FONT_M.fb) * S;
+    var sm = SETM[state.set], y1 = 0, y2 = 700, y3 = 700 - (-sm.fm.fb) * sm.S;
     return '<line x1="-430" x2="430" y1="' + y1 + '" y2="' + y1 + '" stroke="#C9C5BB" stroke-width="2" stroke-dasharray="8 8"/>' +
            '<line x1="-430" x2="430" y1="' + y2 + '" y2="' + y2 + '" stroke="#C9C5BB" stroke-width="2" stroke-dasharray="8 8"/>' +
            '<line x1="-430" x2="430" y1="' + y3 + '" y2="' + y3 + '" stroke="#E3DFD6" stroke-width="2"/>';
   }
   function renderInspector(){
-    var st = SETS[state.set]; if (!st) return;
+    var st = curSet(); if (!st) return;
     var ch = state.sel || CHARS[state.set][0], A = st.As[ch], r = synth(ch);
-    var inN = A.C.reduce(function(t, s){ return t + s.length; }, 0), orgN = FONTS.Regular[ch].c.reduce(function(t, c){ return t + c.length - 1; }, 0);
-    var html = '<figure><svg viewBox="' + VB + '" role="img" aria-label="元の Regular の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rawContours('Regular', ch)) + '" fill="var(--ghost)"/></svg>' +
+    var inN = A.C.reduce(function(t, s){ return t + s.length; }, 0), orgN = inN;
+    var html = '<figure><svg viewBox="' + VBS[state.set] + '" role="img" aria-label="元の Regular の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rawContours('Regular', ch)) + '" fill="var(--ghost)"/></svg>' +
       '<figcaption><span>元（Regular）</span><span>アンカー ' + orgN + '</span></figcaption></figure>';
-    html += '<figure><svg viewBox="' + VB + '" role="img" aria-label="合成した ' + ch + '">' + metricLines() + '<path d="' + r.d + '" fill="var(--ink)"/>' + (state.showAnc ? anchorsSvg(r.C) : '') + '</svg>' +
+    html += '<figure><svg viewBox="' + VBS[state.set] + '" role="img" aria-label="合成した ' + ch + '">' + metricLines() + '<path d="' + r.d + '" fill="var(--ink)"/>' + (state.showAnc ? anchorsSvg(r.C) : '') + '</svg>' +
       '<figcaption><span>合成</span><span>アンカー ' + orgN + ' → ' + r.n + '</span></figcaption></figure>';
     if (state.cmp !== 'none'){
       var rc = rawContours(state.cmp, ch);
       if (r.area === null) r.area = inkArea(r.C);
       var ratio = r.area / inkArea(rc) * 100;
-      html += '<figure><svg viewBox="' + VB + '" role="img" aria-label="本物の ' + state.cmp + ' の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rc) + '" fill="var(--cmp)" fill-opacity="0.9"/><path d="' + r.d + '" fill="none" stroke="var(--ink)" stroke-width="3"/></svg>' +
+      html += '<figure><svg viewBox="' + VBS[state.set] + '" role="img" aria-label="本物の ' + state.cmp + ' の ' + ch + '">' + metricLines() + '<path d="' + pathOf(rc) + '" fill="var(--cmp)" fill-opacity="0.9"/><path d="' + r.d + '" fill="none" stroke="var(--ink)" stroke-width="3"/></svg>' +
         '<figcaption><span>本物（' + state.cmp + '）＋合成の輪郭</span><span>黒み ' + ratio.toFixed(1) + '%</span></figcaption></figure>';
-    } else html += '<figure><svg viewBox="' + VB + '" aria-hidden="true">' + metricLines() + '</svg><figcaption><span>比較なし</span><span></span></figcaption></figure>';
+    } else html += '<figure><svg viewBox="' + VBS[state.set] + '" aria-hidden="true">' + metricLines() + '</svg><figcaption><span>比較なし</span><span></span></figcaption></figure>';
     document.getElementById('insp').innerHTML = html;
   }
   function renderStats(){
-    var st = SETS[state.set]; if (!st) return;
-    var u = function(v){ return (v / S).toFixed(1); };
+    var st = curSet(); if (!st) return;
+    var u = function(v){ return (v / SETM[state.set].S).toFixed(1); };
     var Vt = st.ST.V * P.W / 100, Ht = Vt * P.ratio / 100;
     var chips = ['Regular StdVW ' + u(st.ST.V) + ' / StdHW ' + u(st.ST.H), '合成 縦 ' + u(Vt) + ' / 横 ' + u(Ht)];
     var key = state.cmp + ':' + state.set;
@@ -299,14 +312,14 @@ var FONTS = /*__FONTS__*/null;
       chips.push('黒み（合成/本物）中央値 ' + (median(rs) * 100).toFixed(1) + '%');
     }
     var tin = 0, tout = 0;
-    CHARS[state.set].forEach(function(ch){ tin += FONTS.Regular[ch].c.reduce(function(t, c){ return t + c.length - 1; }, 0); tout += synth(ch).n; });
+    CHARS[state.set].forEach(function(ch){ tin += curSet().As[ch].C.reduce(function(t, c){ return t + c.length; }, 0); tout += synth(ch).n; });
     chips.push('アンカー ' + tin + ' → ' + tout);
     document.getElementById('stats').innerHTML = chips.map(function(c){ return '<span class="chip">' + c + '</span>'; }).join('') + '<span class="chip">単位：フォント単位（1000/em）</span>';
   }
   function renderAll(){ renderInspector(); renderGrid(); renderStats(); }
   var pend = null, pendGrid = null;
   function schedule(quick){
-    if (!SETS[state.set]) return;
+    if (!curSet()) return;
     if (pend) cancelAnimationFrame(pend);
     pend = requestAnimationFrame(function(){ pend = null; renderInspector(); });
     if (pendGrid) clearTimeout(pendGrid);
@@ -316,7 +329,7 @@ var FONTS = /*__FONTS__*/null;
   document.getElementById('match').disabled = false;
   ensureSet('hira', function(){
     renderAll();
-    ensureCmpStems('Bold', 'hira', function(T){ var st = SETS.hira.ST; P.W = Math.round(T.V / st.V * 100); P.ratio = Math.round(T.ratio * 100); syncSliders(); renderAll(); });
+    ensureCmpStems('Bold', 'hira', function(T){ var st = curSet().ST; P.W = Math.round(T.V / st.V * 100); P.ratio = Math.round(T.ratio * 100); syncSliders(); renderAll(); });
   });
 })();
 </script>

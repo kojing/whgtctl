@@ -6,7 +6,7 @@ var A0=jsx.lastIndexOf('/* =====',jsx.indexOf('/* ES3 用の最小ポリフィ�
 eval(jsx.slice(A0,B0)+fs.readFileSync(path.join(__dirname,'loader.js'),'utf8'));
 var F=JSON.parse(fs.readFileSync(path.join(__dirname,'kana.json'),'utf8'));
 var s=700/(FONT_M.ft-FONT_M.fb), m={ft:700,fb:0,mid:350,band:50,spanK:4};
-function setOf(w,chars){ var ws=[], L={}; chars.forEach(function(ch){ var A=analyzeGlyph(glyphContours(F[w][ch],s), m); L[ch]=A; ws=ws.concat(glyphVerticalWidths(A)); }); var W2=median(ws); chars.forEach(function(ch){finishGlyph(L[ch],W2);}); return {As:L, ST:computeStems(chars.map(function(c){return L[c];}),W2), Wm:W2}; }
+function setOf(w,chars){ var ws=[], L={}; chars.forEach(function(ch){ var A=analyzeGlyph(glyphContours(F[w][ch],s), m, {compat: w==='Regular' && !!global.COMPAT}); L[ch]=A; ws=ws.concat(glyphVerticalWidths(A)); }); var W2=median(ws); chars.forEach(function(ch){finishGlyph(L[ch],W2);}); return {As:L, ST:computeStems(chars.map(function(c){return L[c];}),W2), Wm:W2}; }
 function raster(C){ var polys=C.map(function(sg){ var P=flattenSegs(sg,16); var bb=[1e9,1e9,-1e9,-1e9]; P.forEach(function(q){ bb[0]=Math.min(bb[0],q[0]); bb[1]=Math.min(bb[1],q[1]); bb[2]=Math.max(bb[2],q[0]); bb[3]=Math.max(bb[3],q[1]); }); P.bb=bb; return P; });
   var N=120, out=new Uint8Array(N*N); for (var j=0;j<N;j++){ var y=-50+j*(800/N)+3.3; for (var i=0;i<N;i++){ var x=-400+i*(800/N)+3.3; out[j*N+i]=windingAt(polys,x,y)!==0?1:0; } } return out; }
 function iou(a,b){ var I=0,U=0; for (var k=0;k<a.length;k++){ if (a[k]&&b[k]) I++; if (a[k]||b[k]) U++; } return U?I/U:1; }

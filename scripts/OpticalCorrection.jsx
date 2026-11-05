@@ -1,5 +1,5 @@
 ﻿/*
-  OpticalCorrection.jsx  v0.2
+  OpticalCorrection.jsx  v0.3
   Illustrator 用：塗りパスで組んだ文字のウェイト変更・太さの均一化・縦横比・光学補正
 
   使い方
@@ -123,9 +123,9 @@ function smoothstepCos(d, R) { return d >= R ? 0 : (1 + Math.cos(Math.PI * d / R
 var ENG = { STEP: 9, FLAT: 10, SAMP: 12 };
 
 // contours: [{segs:[...]}]  m: {ft, fb, mid, band, spanK}
-function analyzeGlyph(contours, m) {
-  var added = 0;
-  var C = contours.map(function (segs) { var r = addExtrema(segs); added += r.added; return r.segs; });
+function analyzeGlyph(contours, m, opts) {
+  var added = 0, noEx = opts && opts.compat;
+  var C = contours.map(function (segs) { if (noEx) return segs; var r = addExtrema(segs); added += r.added; return r.segs; });
   var flat = C.map(function (segs) {
     var p = [];
     segs.forEach(function (g) {
@@ -351,7 +351,7 @@ function offsetCurve(g, a2, b2, D, tol, depth, out) {
   var t0 = startTan(g), te = endTan(g), t1 = [-te[0], -te[1]];
   var cand = fitFixedTangents(Q, us, a2, b2, t0, t1), err = 0;
   for (var k = 0; k < Q.length; k++) { var e = distToCurve(cand, Q[k]); if (e > err) err = e; }
-  if (err <= tol || depth >= 2) { out.push(cand); return; }
+  if (err <= tol || depth >= (tol < 0 ? 0 : 2)) { out.push(cand); return; }
   var sp = splitBez(g, 0.5), Pm = sp[0].b, Tm = segTan(g, 0.5), dmid = D(0.5), M2 = [Pm[0] - Tm[1] * dmid, Pm[1] + Tm[0] * dmid];
   offsetCurve(sp[0], a2, M2, function (t) { return D(t / 2); }, tol, depth + 1, out);
   offsetCurve(sp[1], M2, b2, function (t) { return D(0.5 + t / 2); }, tol, depth + 1, out);
@@ -482,12 +482,17 @@ function deformGlyph(A, ST, p) {
     }
     var res = [];
     segs.forEach(function (S, i2) {
-      if (drop[i2]) return;
+      if (drop[i2]) {
+        if (!p.compat) return;
+        var X2 = disp[i2];                                   // 互換モード：点を消さず、長さ 0 の辺として残す
+        res.push({ a: X2, c1: X2, c2: disp[(i2 + 1) % n], b: disp[(i2 + 1) % n], line: S.g.line });
+        return;
+      }
       var a2 = disp[i2], b2 = disp[(i2 + 1) % n];
       if (S.g.line) { res.push({ a: a2, c1: a2, c2: b2, b: b2, line: true }); return; }
       var F = DF[ci][i2], sA = dAt[i2], sB = dAt[(i2 + 1) % n], e0 = sA === null ? 0 : sA - F(0), e1 = sB === null ? 0 : sB - F(1);
       var G = function (t) { return F(t) + e0 * (1 - t) + e1 * t; };
-      var parts = []; offsetCurve(S.g, a2, b2, G, p.prec, 0, parts);
+      var parts = []; offsetCurve(S.g, a2, b2, G, p.compat ? -1 : p.prec, 0, parts);
       parts.forEach(function (q) { res.push(q); });
     });
     return res.map(function (g) { var a = post(g.a, ci), b = post(g.b, ci); return { a: a, c1: g.line ? a : post(g.c1, ci), c2: g.line ? b : post(g.c2, ci), b: b, line: g.line }; });
@@ -519,7 +524,7 @@ function restorePath(pi, snap) {
   pi.setEntirePath(anchors);
   for (var i = 0; i < snap.length; i++) { var q = pi.pathPoints[i]; q.anchor = snap[i].a; q.leftDirection = snap[i].l; q.rightDirection = snap[i].r; q.pointType = snap[i].t; }
 }
-function writeSegs(pi, segs, T) {
+function writeSegs(pi, segs, T, keepTypes) {
   var n = segs.length, anchors = [], i;
   for (i = 0; i < n; i++) anchors.push(T.inv(segs[i].a));
   pi.setEntirePath(anchors);
@@ -530,7 +535,7 @@ function writeSegs(pi, segs, T) {
     q.leftDirection = T.inv(gp.line ? g.a : gp.c2);
     var tin = nrm([g.a[0] - (gp.line ? gp.a : gp.c2)[0], g.a[1] - (gp.line ? gp.a : gp.c2)[1]]);
     var tout = nrm([(g.line ? g.b : g.c1)[0] - g.a[0], (g.line ? g.b : g.c1)[1] - g.a[1]]);
-    q.pointType = (!g.line && !gp.line && (tin[0] * tout[0] + tin[1] * tout[1]) > 0.999) ? PointType.SMOOTH : PointType.CORNER;
+    q.pointType = (keepTypes && keepTypes.length === n) ? keepTypes[i] : ((!g.line && !gp.line && (tin[0] * tout[0] + tin[1] * tout[1]) > 0.999) ? PointType.SMOOTH : PointType.CORNER);
   }
 }
 // グリフ（グループ or 選択パスの集合）から塗りの閉パスを集める
@@ -578,7 +583,7 @@ function detectMetrics(glyphs) {
   var h = median(glyphs.map(function (G) { return G.bounds.t - G.bounds.b; })) || 1;
   return { base: modeValue(bots, h * 0.01), top: modeValue(tops, h * 0.01) };
 }
-function analyzeJob(glyphs, met, script) {
+function analyzeJob(glyphs, met, script, compat) {
   var H = met.top - met.base; if (H <= 0) throw new Error('メトリクスの上端がベースラインより下になっています。');
   var s = 700 / H;
   var m = script === 'kana' ? { ft: 700, fb: 0, mid: 350, band: 50, spanK: 4 } : { ft: 700, fb: 0, mid: 350, band: 4, spanK: 2 };
@@ -589,7 +594,7 @@ function analyzeJob(glyphs, met, script) {
       fwd: function (pt) { return [(pt[0] - ox) * s, (pt[1] - met.base) * s]; },
       inv: function (pt) { return [pt[0] / s + ox, pt[1] / s + met.base]; }
     };
-    G.snaps = [];
+    G.snaps = []; G.rev = [];
     var contours = [], owners = [];
     G.entries.forEach(function (e) {
       var segsList = e.paths.map(function (pi) { return pathToSegs(pi, G.T); });
@@ -603,24 +608,31 @@ function analyzeJob(glyphs, met, script) {
         }
         var wantPos = depth % 2 === 0, isPos = polyArea(polys[k]) >= 0;
         var segs = (wantPos === isPos) ? sg : reverseC(sg);
-        contours.push(segs); owners.push(e.paths[k]);
+        contours.push(segs); owners.push(e.paths[k]); G.rev.push(wantPos !== isPos);
         G.snaps.push({ path: e.paths[k], snap: snapshotPath(e.paths[k]) });
       });
     });
     G.owners = owners;
-    G.A = analyzeGlyph(contours, m);
+    G.A = analyzeGlyph(contours, m, { compat: compat });
     widths = widths.concat(glyphVerticalWidths(G.A));
   });
   var Wm = median(widths) || 90;
   glyphs.forEach(function (G) { finishGlyph(G.A, Wm); });
   var ST = computeStems(glyphs.map(function (G) { return G.A; }), Wm);
-  return { glyphs: glyphs, ST: ST, scale: s, Wm: Wm };
+  return { glyphs: glyphs, ST: ST, scale: s, Wm: Wm, compat: compat };
 }
 function applyJob(job, p) {
   var added = 0, total = 0;
   job.glyphs.forEach(function (G) {
     var out = deformGlyph(G.A, job.ST, p);
-    out.forEach(function (segs, k) { writeSegs(G.owners[k], segs, G.T); total += segs.length; });
+    out.forEach(function (segs, k) {
+      if (job.compat) {
+        // 互換モード：元のパスと同じ向き・始点・点の種類で書き戻す（元のパスや他のウェイトと補間できる）
+        var w = G.rev[k] ? reverseC(segs) : segs;
+        writeSegs(G.owners[k], w, G.T, G.snaps[k].snap.map(function (o) { return o.t; }));
+        total += w.length;
+      } else { writeSegs(G.owners[k], segs, G.T); total += segs.length; }
+    });
     G.A.C.forEach(function (segs) { added -= segs.length; });
   });
   return total;
@@ -676,10 +688,11 @@ function runDialog(glyphs) {
   var po = dlg.add('panel', undefined, '光学補正・精度（u = メトリクス高さの 1/700）'); po.alignChildren = 'fill';
   addSlider(po, 'os', 'オーバーシュート（頂点・曲線）', 0, 30, 'u');
   addSlider(po, 'oc', '光学的中心（中央の横画）', 0, 40, 'u');
-  addSlider(po, 'prec', '曲線の許容誤差', 1, 8, 'u');
+  addSlider(po, 'prec', '曲線の許容誤差（互換オフ時）', 1, 8, 'u');
 
   var bottom = dlg.add('group'); bottom.orientation = 'row'; bottom.alignment = 'fill';
   var cbPrev = bottom.add('checkbox', undefined, 'プレビュー'); cbPrev.value = true;
+  var cbCompat = bottom.add('checkbox', undefined, '頂点数を揃える（ウェイト間で互換）'); cbCompat.value = true;
   var bReset = bottom.add('button', undefined, 'リセット');
   var sp = bottom.add('group'); sp.alignment = 'fill';
   var bCancel = bottom.add('button', undefined, 'キャンセル', { name: 'cancel' });
@@ -687,16 +700,16 @@ function runDialog(glyphs) {
 
   function setVal(key, v) { P[key] = v; if (sliders[key]) { sliders[key].sl.value = v; sliders[key].et.text = String(v); } }
   function params() {
-    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec };
+    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec, compat: cbCompat.value };
   }
   var dirty = false;
   function reanalyze() {
     if (job && dirty) { restoreJob(job); dirty = false; }
     met = { base: parseFloat(eBase.text), top: parseFloat(eTop.text) };
     script = dd.selection.index === 1 ? 'kana' : 'latin';
-    job = analyzeJob(glyphs, met, script);
+    job = analyzeJob(glyphs, met, script, cbCompat.value);
     var u2pt = 1 / job.scale;
-    info.text = 'グリフ ' + glyphs.length + ' 個 ／ StdVW ' + (job.ST.V * u2pt).toFixed(1) + ' pt ・ StdHW ' + (job.ST.H * u2pt).toFixed(1) + ' pt（横/縦 ' + Math.round(job.ST.ratio * 100) + '%）';
+    info.text = (job.compat ? '［頂点数を保持］' : '［点の追加あり］') + 'グリフ ' + glyphs.length + ' 個 ／ StdVW ' + (job.ST.V * u2pt).toFixed(1) + ' pt ・ StdHW ' + (job.ST.H * u2pt).toFixed(1) + ' pt（横/縦 ' + Math.round(job.ST.ratio * 100) + '%）';
   }
   function refresh() {
     if (!job) return;
@@ -708,6 +721,7 @@ function runDialog(glyphs) {
   dd.onChange = function () { reanalyze(); refresh(); };
   eBase.onChange = eTop.onChange = function () { reanalyze(); refresh(); };
   cbPrev.onClick = refresh;
+  cbCompat.onClick = function () { reanalyze(); refresh(); };
   bReset.onClick = function () { for (var k2 in DEF) setVal(k2, DEF[k2]); setVal('ratio', Math.round(job.ST.ratio * 100)); refresh(); };
 
   reanalyze();
