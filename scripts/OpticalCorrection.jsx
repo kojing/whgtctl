@@ -1,5 +1,5 @@
 ﻿/*
-  OpticalCorrection.jsx  v0.3
+  OpticalCorrection.jsx  v0.4
   Illustrator 用：塗りパスで組んだ文字のウェイト変更・太さの均一化・縦横比・光学補正
 
   使い方
@@ -650,6 +650,20 @@ function runDialog(glyphs) {
   var dlg = new Window('dialog', '光学補正 / ウェイト調整');
   dlg.orientation = 'column'; dlg.alignChildren = 'fill';
   var info = dlg.add('statictext', undefined, '', { multiline: true }); info.preferredSize = [420, 34];
+  var status = dlg.add('statictext', undefined, '準備中…'); status.preferredSize = [420, 18];
+  var errShown = false, nUpd = 0, lastEnd = 0, busy = false;
+  // ScriptUI はイベント処理中のエラーを表示しないため、すべてのハンドラをここで包んで表示する
+  function safe(fn) {
+    return function () {
+      try { fn.apply(this, arguments); }
+      catch (e) {
+        busy = false;
+        status.text = 'エラー: ' + e.message + (e.line ? '（行 ' + e.line + '）' : '');
+        if (!errShown) { errShown = true; alert('プレビュー更新でエラーが発生しました\n' + e.message + (e.line ? '\n行 ' + e.line : '')); }
+      }
+    };
+  }
+  function now() { return new Date().getTime(); }
 
   var mp = dlg.add('panel', undefined, 'メトリクス（ドキュメント座標・pt）'); mp.orientation = 'row'; mp.alignChildren = 'center';
   mp.add('statictext', undefined, '書体');
@@ -666,15 +680,20 @@ function runDialog(glyphs) {
     var sl = g.add('slider', undefined, P[key], min, max); sl.preferredSize = [160, 20];
     var et = g.add('edittext', undefined, String(P[key])); et.characters = 5;
     g.add('statictext', undefined, unit);
-    sl.onChanging = function () { P[key] = Math.round(sl.value); et.text = String(P[key]); };
-    sl.onChange = function () { P[key] = Math.round(sl.value); et.text = String(P[key]); refresh(); };
-    et.onChange = function () { var v = parseFloat(et.text); if (isNaN(v)) v = P[key]; v = Math.max(min, Math.min(max, v)); P[key] = v; sl.value = v; et.text = String(v); refresh(); };
+    // ドラッグ中も間引いて更新する（環境によっては onChange が来ないことがあるため）
+    sl.onChanging = safe(function () {
+      var v = Math.round(sl.value); if (v === P[key]) return;
+      P[key] = v; et.text = String(v);
+      if (!busy && now() - lastEnd > 250) refresh();
+    });
+    sl.onChange = safe(function () { P[key] = Math.round(sl.value); et.text = String(P[key]); refresh(); });
+    et.onChange = safe(function () { var v = parseFloat(et.text); if (isNaN(v)) v = P[key]; v = Math.max(min, Math.min(max, v)); P[key] = v; sl.value = v; et.text = String(v); refresh(); });
     sliders[key] = { sl: sl, et: et };
   }
   var pw = dlg.add('panel', undefined, 'ウェイト'); pw.alignChildren = 'fill';
   var wb = pw.add('group'); wb.orientation = 'row';
   var presetsW = [['Thin', 45], ['Light', 70], ['Regular', 100], ['Bold', 135], ['Black', 170]];
-  presetsW.forEach(function (pr) { var b = wb.add('button', undefined, pr[0]); b.preferredSize = [76, 24]; b.onClick = function () { setVal('W', pr[1]); refresh(); }; });
+  presetsW.forEach(function (pr) { var b = wb.add('button', undefined, pr[0]); b.preferredSize = [76, 24]; b.onClick = safe(function () { setVal('W', pr[1]); refresh(); }); });
   addSlider(pw, 'W', '縦画の太さ（元の StdVW 比）', 30, 200, '%');
   addSlider(pw, 'mg', 'カウンター保護（最小の空き）', 0, 80, '%');
   addSlider(pw, 'cp', 'カウンター保持（字幅で吸収）', 0, 100, '%');
@@ -693,6 +712,7 @@ function runDialog(glyphs) {
   var bottom = dlg.add('group'); bottom.orientation = 'row'; bottom.alignment = 'fill';
   var cbPrev = bottom.add('checkbox', undefined, 'プレビュー'); cbPrev.value = true;
   var cbCompat = bottom.add('checkbox', undefined, '頂点数を揃える（ウェイト間で互換）'); cbCompat.value = true;
+  var bUpd = bottom.add('button', undefined, 'プレビュー更新');
   var bReset = bottom.add('button', undefined, 'リセット');
   var sp = bottom.add('group'); sp.alignment = 'fill';
   var bCancel = bottom.add('button', undefined, 'キャンセル', { name: 'cancel' });
@@ -712,17 +732,27 @@ function runDialog(glyphs) {
     info.text = (job.compat ? '［頂点数を保持］' : '［点の追加あり］') + 'グリフ ' + glyphs.length + ' 個 ／ StdVW ' + (job.ST.V * u2pt).toFixed(1) + ' pt ・ StdHW ' + (job.ST.H * u2pt).toFixed(1) + ' pt（横/縦 ' + Math.round(job.ST.ratio * 100) + '%）';
   }
   function refresh() {
-    if (!job) return;
-    if (!cbPrev.value) { if (dirty) { restoreJob(job); dirty = false; app.redraw(); } return; }
+    if (!job || busy) return;
+    busy = true;
+    var t0 = now();
+    if (!cbPrev.value) {
+      if (dirty) { restoreJob(job); dirty = false; app.redraw(); }
+      status.text = 'プレビュー：オフ';
+      busy = false; lastEnd = now(); return;
+    }
+    status.text = '更新中…'; dlg.update && dlg.update();
     if (dirty) restoreJob(job);
     var n = applyJob(job, params()); dirty = true;
     app.redraw();
+    nUpd++; lastEnd = now(); busy = false;
+    status.text = 'プレビュー更新 ' + nUpd + ' 回目 ・ ' + ((lastEnd - t0) / 1000).toFixed(1) + ' 秒 ・ 縦画 ' + P.W + '% ・ アンカー ' + n;
   }
-  dd.onChange = function () { reanalyze(); refresh(); };
-  eBase.onChange = eTop.onChange = function () { reanalyze(); refresh(); };
-  cbPrev.onClick = refresh;
-  cbCompat.onClick = function () { reanalyze(); refresh(); };
-  bReset.onClick = function () { for (var k2 in DEF) setVal(k2, DEF[k2]); setVal('ratio', Math.round(job.ST.ratio * 100)); refresh(); };
+  dd.onChange = safe(function () { reanalyze(); refresh(); });
+  eBase.onChange = eTop.onChange = safe(function () { reanalyze(); refresh(); });
+  cbPrev.onClick = safe(refresh);
+  bUpd.onClick = safe(refresh);
+  cbCompat.onClick = safe(function () { reanalyze(); refresh(); });
+  bReset.onClick = safe(function () { for (var k2 in DEF) setVal(k2, DEF[k2]); setVal('ratio', Math.round(job.ST.ratio * 100)); refresh(); });
 
   reanalyze();
   setVal('ratio', Math.round(job.ST.ratio * 100)); DEF.ratio = P.ratio;
