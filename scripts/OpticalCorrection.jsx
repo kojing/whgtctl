@@ -120,12 +120,38 @@ function smoothstepCos(d, R) { return d >= R ? 0 : (1 + Math.cos(Math.PI * d / R
 /* ====================================================================== */
 /* 解析（座標は「メトリクス高さ = 700u」に正規化済み、y 上向き）            */
 /* ====================================================================== */
-var ENG = { STEP: 9, FLAT: 10, SAMP: 12 };
+var ENG = { STEP: 9, FLAT: 10, SAMP: 12, BALL: false, TENS: 0.5, FREE: false, CSPLIT: 0 };
+// 内接円（shrinking ball）：p で輪郭に接し、内側に向かって他の輪郭点に触れるまで膨らませた円の直径＝その点での画の太さ
+function ballWidth(pts, px, py, nx, ny, cap) {
+  var r = cap / 2;
+  for (var i = 0; i < pts.length; i++) {
+    var dx = pts[i][0] - px, dy = pts[i][1] - py, dn = dx * nx + dy * ny;
+    if (dn <= 1e-3) continue;
+    var d2 = dx * dx + dy * dy;
+    if (d2 < 4) continue;                                  // 自分のすぐ隣の点は除く
+    var rr = d2 / (2 * dn); if (rr < r) r = rr;
+  }
+  return 2 * r;
+}
 
 // contours: [{segs:[...]}]  m: {ft, fb, mid, band, spanK}
+// 元の形だけで決まる分割（どのウェイトでも同じ位置で割れるので頂点数が揃う）
+function splitByTurn(segs, deg) {
+  var out = [], added = 0;
+  segs.forEach(function (g) {
+    if (g.line) { out.push(g); return; }
+    var a = startTan(g), b = endTan(g), ang = Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1]))) * 180 / Math.PI;
+    var k = Math.max(1, Math.ceil(ang / deg - 0.05)), cur = g;
+    for (var j = 1; j < k; j++) { var sp = splitBez(cur, 1 / (k - j + 1)); out.push(sp[0]); cur = sp[1]; added++; }
+    out.push(cur);
+  });
+  return { segs: out, added: added };
+}
 function analyzeGlyph(contours, m, opts) {
   var added = 0, noEx = opts && opts.compat;
-  var C = contours.map(function (segs) { if (noEx) return segs; var r = addExtrema(segs); added += r.added; return r.segs; });
+  var C = contours.map(function (segs) {
+    if (noEx) { if (!ENG.CSPLIT) return segs; var r2 = splitByTurn(segs, ENG.CSPLIT); added += r2.added; return r2.segs; }
+    var r = addExtrema(segs); added += r.added; return r.segs; });
   var flat = C.map(function (segs) {
     var p = [];
     segs.forEach(function (g) {
@@ -142,6 +168,12 @@ function analyzeGlyph(contours, m, opts) {
   var ins = function (x, y) { return windingAt(flat, x, y) !== 0; };
   var edges = [];
   flat.forEach(function (P) { for (var i = 0; i < P.length; i++) { var a = P[i], b = P[(i + 1) % P.length]; edges.push([a[0], a[1], b[0], b[1]]); } });
+  // 内接円用の輪郭点（細かめに）
+  var bpts = [];
+  if (ENG.BALL) C.forEach(function (segs) { segs.forEach(function (g) {
+    var L = g.line ? hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) : hyp(g.c1[0] - g.a[0], g.c1[1] - g.a[1]) + hyp(g.c2[0] - g.c1[0], g.c2[1] - g.c1[1]) + hyp(g.b[0] - g.c2[0], g.b[1] - g.c2[1]);
+    var k = Math.max(2, Math.ceil(L / 4)); for (var j = 0; j < k; j++) bpts.push(bez(g, j / k));
+  }); });
   var SEG = C.map(function (segs, ci) {
     return segs.map(function (g, si) {
       var len = g.line ? hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) : 0;
@@ -151,8 +183,11 @@ function analyzeGlyph(contours, m, opts) {
         var s = { x: P[0], y: P[1], tx: T[0], ty: T[1], t: t, nx: -T[1], ny: T[0] };
         s.vis = ins(s.x + s.nx * 1.5, s.y + s.ny * 1.5) && !ins(s.x - s.nx * 1.5, s.y - s.ny * 1.5);
         if (s.vis) {
-          s.w = rayExit(flat, edges, s.x + s.nx * 0.75, s.y + s.ny * 0.75, s.nx, s.ny) + 0.75;
+          s.wr = rayExit(flat, edges, s.x + s.nx * 0.75, s.y + s.ny * 0.75, s.nx, s.ny) + 0.75;
+          s.w = ENG.BALL ? Math.min(s.wr, ballWidth(bpts, s.x, s.y, s.nx, s.ny, s.wr)) : s.wr;
           s.gap = rayEnter(flat, edges, s.x - s.nx * 0.75, s.y - s.ny * 0.75, -s.nx, -s.ny) + 0.75;
+          // 反対側の輪郭のさらに外：文字の外側か、別の画との間（カウンター）か
+          s.gapOpp = rayEnter(flat, edges, s.x + s.nx * (s.wr + 0.75), s.y + s.ny * (s.wr + 0.75), s.nx, s.ny) + 0.75;
         }
         sm.push(s);
       }
@@ -176,7 +211,7 @@ function finishGlyph(A, Wm) {
   all.forEach(function (S) {
     S.sm.forEach(function (s) {
       if (!s.vis) return;
-      s.cap = s.w > CAPW && !A.ins(s.x + s.tx * CAPD + s.nx * 2, s.y + s.ty * CAPD + s.ny * 2) && !A.ins(s.x - s.tx * CAPD + s.nx * 2, s.y - s.ty * CAPD + s.ny * 2);
+      s.cap = (s.wr || s.w) > CAPW && !A.ins(s.x + s.tx * CAPD + s.nx * 2, s.y + s.ty * CAPD + s.ny * 2) && !A.ins(s.x - s.tx * CAPD + s.nx * 2, s.y - s.ty * CAPD + s.ny * 2);
     });
   });
   all.forEach(function (S) {
@@ -184,7 +219,8 @@ function finishGlyph(A, Wm) {
     S.visFrac = vis.length / S.sm.length;
     S.capFrac = vis.length ? (vis.length - body.length) / vis.length : 0;
     var good = body.filter(function (s) { return s.w < 1.6 * Wm; });
-    S.longFrac = body.length ? 1 - good.length / body.length : 0;
+    var shortR = body.filter(function (s) { return (s.wr || s.w) < 1.6 * Wm; });
+    S.longFrac = body.length ? 1 - shortR.length / body.length : 0;
     S.hidden = S.visFrac < 0.25;
     S.isCap = !S.hidden && S.capFrac > 0.5;
     S.coincide = !S.hidden && !S.isCap && S.longFrac > 0.6;
@@ -193,20 +229,21 @@ function finishGlyph(A, Wm) {
     if (g.line) {
       S.w = median(good.map(function (s) { return s.w; })) || Wm;
       S.gap = median(good.map(function (s) { return s.gap; })) || 1000;
+      S.gapOpp = median(good.map(function (s) { return s.gapOpp; })) || 1000;
       var hy = good.map(function (s) { return s.y + s.ny * S.w; });
       S.opp = S.cls === 'h' && hy.length > 0 && hy.filter(function (y) { return Math.abs(y - m.ft) < tolM * 1.5 || Math.abs(y - m.fb) < tolM * 1.5; }).length > hy.length / 2;
     } else {
       S.sm.forEach(function (s, i) {
-        var v = [], gv = [];
-        for (var d = -3; d <= 3; d++) { var o = S.sm[i + d]; if (o && o.vis && !o.cap && o.w < 1.6 * Wm) { v.push(o.w); gv.push(o.gap); } }
-        s.wf = v.length ? median(v) : null; s.gf = gv.length ? median(gv) : 1000;
+        var v = [], gv = [], ov = [];
+        for (var d = -3; d <= 3; d++) { var o = S.sm[i + d]; if (o && o.vis && !o.cap && o.w < 1.6 * Wm) { v.push(o.w); gv.push(o.gap); ov.push(o.gapOpp); } }
+        s.wf = v.length ? median(v) : null; s.gf = gv.length ? median(gv) : 1000; s.gof = ov.length ? median(ov) : 1000;
       });
       var known = S.sm.filter(function (s) { return s.wf !== null; });
       S.sm.forEach(function (s) {
         if (s.wf !== null) return;
         var best = null, bd = 9;
         known.forEach(function (o) { var d = Math.abs(o.t - s.t); if (d < bd) { bd = d; best = o; } });
-        s.wf = best ? best.wf : Wm; s.gf = best ? best.gf : 1000;
+        s.wf = best ? best.wf : Wm; s.gf = best ? best.gf : 1000; s.gof = best ? best.gof : 1000;
       });
       S.opp = false;
     }
@@ -293,6 +330,15 @@ function targetFor(w, nx, ny, M, p) {
   var s2 = 2 * nx * ny; wt *= 1 - p.dg * s2 * s2;
   return wt;
 }
+// 太る量の配分：文字の外側を向いた辺と、内側（カウンター）を向いた辺で分ける
+function shareK(gap, gapOpp, p, nx, ny) {
+  var ex = p.outX === undefined ? (p.out === undefined ? 0.5 : p.out) : p.outX, ey = p.outY === undefined ? ex : p.outY;
+  var e = (nx === undefined) ? ex : nx * nx * ex + ny * ny * ey;
+  var oe = gap >= 900, oo = (gapOpp === undefined ? 1000 : gapOpp) >= 900;
+  if (oe && !oo) return 2 * e;
+  if (!oe && oo) return 2 * (1 - e);
+  return 1;
+}
 function dFrom(w, gap, nx, ny, k, M, p) {
   var wt = targetFor(w, nx, ny, M, p), d = k * (w - wt) / 2;
   if (d < 0 && gap < 900) { var room = Math.max(0, (gap - p.mg * M.Vt) / 2); if (-d > room) d = -room; }
@@ -302,8 +348,8 @@ function constF(v) { return function () { return v; }; }
 function segDFun(S, M, p) {
   if (S.onMetric) return constF(0);
   var k = S.opp ? 2 : 1;
-  if (S.g.line) return constF(dFrom(S.w, S.gap, S.n0[0], S.n0[1], k, M, p));
-  var ds = S.dsm || S.sm.map(function (s) { return { t: s.t, d: dFrom(s.wf, s.gf, s.nx, s.ny, 1, M, p) }; });
+  if (S.g.line) return constF(dFrom(S.w, S.gap, S.n0[0], S.n0[1], S.opp ? 2 : shareK(S.gap, S.gapOpp, p, S.n0[0], S.n0[1]), M, p));
+  var ds = S.dsm || S.sm.map(function (s) { return { t: s.t, d: dFrom(s.wf, s.gf, s.nx, s.ny, shareK(s.gf, s.gof, p, s.nx, s.ny), M, p) }; });
   var part = function (lo, hi) { return median(ds.filter(function (o) { return o.t >= lo && o.t <= hi; }).map(function (o) { return o.d; })); };
   var d0 = part(0, 0.3), dm = part(0.35, 0.65), d1 = part(0.7, 1);
   return function (t) { var u = 1 - t; return d0 * u * (1 - 2 * t) + dm * 4 * t * u + d1 * t * (2 * t - 1); };
@@ -340,7 +386,7 @@ function distToCurve(cand, Q) {
   }
   return best;
 }
-function offsetCurve(g, a2, b2, D, tol, depth, out) {
+function offsetCurve(g, a2, b2, D, tol, depth, out, tanA, tanB) {
   var N = 12, Q = [], us = [], L = 0, prev = a2;
   for (var j = 1; j < N; j++) {
     var t = j / N, P = bez(g, t), T = segTan(g, t), d = D(t), q = [P[0] - T[1] * d, P[1] + T[0] * d];
@@ -348,8 +394,19 @@ function offsetCurve(g, a2, b2, D, tol, depth, out) {
   }
   L += hyp(b2[0] - prev[0], b2[1] - prev[1]);
   for (var j2 = 0; j2 < us.length; j2++) us[j2] = L > 0 ? us[j2] / L : (j2 + 1) / N;
-  var t0 = startTan(g), te = endTan(g), t1 = [-te[0], -te[1]];
+  var t0 = tanA || startTan(g), te = tanB || endTan(g), t1 = [-te[0], -te[1]];
   var cand = fitFixedTangents(Q, us, a2, b2, t0, t1), err = 0;
+  // 張りの保持：ハンドル長を「元の曲線の張り（ハンドル長 / 弦）」で決め、最小二乗の結果と混ぜる
+  var tk = ENG.TENS === undefined ? 0 : ENG.TENS;
+  if (tk > 0) {
+    var ch0 = hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]), ch1 = hyp(b2[0] - a2[0], b2[1] - a2[1]);
+    if (ch0 > 1e-6) {
+      var la = hyp(g.c1[0] - g.a[0], g.c1[1] - g.a[1]) * ch1 / ch0, lb = hyp(g.b[0] - g.c2[0], g.b[1] - g.c2[1]) * ch1 / ch0;
+      var fa = hyp(cand.c1[0] - a2[0], cand.c1[1] - a2[1]), fb = hyp(cand.c2[0] - b2[0], cand.c2[1] - b2[1]);
+      var na = fa + (la - fa) * tk, nb = fb + (lb - fb) * tk;
+      cand = { a: a2, c1: [a2[0] + t0[0] * na, a2[1] + t0[1] * na], c2: [b2[0] + t1[0] * nb, b2[1] + t1[1] * nb], b: b2, line: false };
+    }
+  }
   for (var k = 0; k < Q.length; k++) { var e = distToCurve(cand, Q[k]); if (e > err) err = e; }
   if (err <= tol || depth >= (tol < 0 ? 0 : 2)) { out.push(cand); return; }
   var sp = splitBez(g, 0.5), Pm = sp[0].b, Tm = segTan(g, 0.5), dmid = D(0.5), M2 = [Pm[0] - Tm[1] * dmid, Pm[1] + Tm[0] * dmid];
@@ -373,7 +430,7 @@ function deformGlyph(A, ST, p) {
       var run = [], j = st; guard = 0;
       while (guard++ < n) { run.push(j); used[j] = true; var nx = (j + 1) % n; if (nx === st || used[nx] || !ok(segs[nx]) || !smoothJoin(segs[j], segs[nx])) break; j = nx; }
       var flat = [];
-      run.forEach(function (si) { var S = segs[si]; S.sm.forEach(function (sm) { flat.push({ S: S, t: sm.t, d: dFrom(sm.wf, sm.gf, sm.nx, sm.ny, 1, M, p) }); }); });
+      run.forEach(function (si) { var S = segs[si]; S.sm.forEach(function (sm) { flat.push({ S: S, t: sm.t, d: dFrom(sm.wf, sm.gf, sm.nx, sm.ny, shareK(sm.gf, sm.gof, p, sm.nx, sm.ny), M, p) }); }); });
       var closed = run.length === n;
       var sm2 = flat.map(function (o, k) {
         var sum = 0, wsum = 0;
@@ -480,6 +537,30 @@ function deformGlyph(A, ST, p) {
       }
       if (!changed) break;
     }
+    // ずらした後の曲線の端の向き：真のオフセット曲線の接線。なめらかな点では両側の向きを平均して揃える
+    var Gs = [], TA = [], TB = [];
+    var offPt = function (g, G, t) { var P = bez(g, t), T = segTan(g, t), d = G(t); return [P[0] - T[1] * d, P[1] + T[0] * d]; };
+    var offTan = function (g, G, t0_, t1_) { var A1 = offPt(g, G, t0_), B1 = offPt(g, G, t1_); return nrm([B1[0] - A1[0], B1[1] - A1[1]]); };
+    for (i = 0; i < n; i++) {
+      var Si = segs[i];
+      if (Si.g.line || drop[i]) { Gs.push(null); continue; }
+      var Fi = DF[ci][i], sAi = dAt[i], sBi = dAt[(i + 1) % n], e0i = sAi === null ? 0 : sAi - Fi(0), e1i = sBi === null ? 0 : sBi - Fi(1);
+      Gs.push((function (F_, a_, b_) { return function (t) { return F_(t) + a_ * (1 - t) + b_ * t; }; })(Fi, e0i, e1i));
+    }
+    if (ENG.FREE) {
+      var near = function (u, v) { return u[0] * v[0] + u[1] * v[1] > Math.cos(25 * Math.PI / 180); };
+      for (i = 0; i < n; i++) {
+        if (Gs[i]) { var ta = offTan(segs[i].g, Gs[i], 0, 0.01); TA[i] = near(ta, segs[i].t0) ? ta : null; }
+        if (Gs[i]) { var tb = offTan(segs[i].g, Gs[i], 0.99, 1); TB[i] = near(tb, segs[i].t1) ? tb : null; }
+      }
+      for (i = 0; i < n; i++) {
+        var pv = (i - 1 + n) % n;
+        if (dAt[i] === null) continue;                      // 角はそれぞれの向きのまま
+        if (Gs[i] && Gs[pv] && TA[i] && TB[pv]) { var av = nrm([TA[i][0] + TB[pv][0], TA[i][1] + TB[pv][1]]); TA[i] = av; TB[pv] = av; }
+        else if (Gs[i] && !Gs[pv]) TA[i] = null;            // 直線となめらかにつながる側は直線の向きを保つ
+        else if (Gs[pv] && !Gs[i]) TB[pv] = null;
+      }
+    }
     var res = [];
     segs.forEach(function (S, i2) {
       if (drop[i2]) {
@@ -490,16 +571,14 @@ function deformGlyph(A, ST, p) {
       }
       var a2 = disp[i2], b2 = disp[(i2 + 1) % n];
       if (S.g.line) { res.push({ a: a2, c1: a2, c2: b2, b: b2, line: true }); return; }
-      var F = DF[ci][i2], sA = dAt[i2], sB = dAt[(i2 + 1) % n], e0 = sA === null ? 0 : sA - F(0), e1 = sB === null ? 0 : sB - F(1);
-      var G = function (t) { return F(t) + e0 * (1 - t) + e1 * t; };
-      var parts = []; offsetCurve(S.g, a2, b2, G, p.compat ? -1 : p.prec, 0, parts);
+      var G = Gs[i2];
+      var parts = []; offsetCurve(S.g, a2, b2, G, p.compat ? -1 : p.prec, 0, parts, TA[i2] || null, TB[i2] || null);
       parts.forEach(function (q) { res.push(q); });
     });
     return res.map(function (g) { var a = post(g.a, ci), b = post(g.b, ci); return { a: a, c1: g.line ? a : post(g.c1, ci), c2: g.line ? b : post(g.c2, ci), b: b, line: g.line }; });
   });
   return out;
 }
-
 /* ====================================================================== */
 /* Illustrator との入出力                                                   */
 /* ====================================================================== */
@@ -644,7 +723,7 @@ function restoreJob(job) { job.glyphs.forEach(function (G) { G.snaps.forEach(fun
 /* ====================================================================== */
 function runDialog(glyphs) {
   var met = detectMetrics(glyphs), script = 'latin', job = null;
-  var P = { W: 100, uni: 100, tol: 30, ratio: 94, dg: 8, mg: 35, cp: 0, ext: 50, os: 12, oc: 16, prec: 2 };
+  var P = { W: 100, uni: 0, tol: 30, ratio: 94, dg: 0, mg: 35, cp: 0, ext: 50, ox: 50, oy: 10, os: 0, oc: 0, prec: 2 };
   var DEF = {}; for (var k in P) DEF[k] = P[k];
 
   var dlg = new Window('dialog', '光学補正 / ウェイト調整');
@@ -698,6 +777,8 @@ function runDialog(glyphs) {
   addSlider(pw, 'mg', 'カウンター保護（最小の空き）', 0, 80, '%');
   addSlider(pw, 'cp', 'カウンター保持（字幅で吸収）', 0, 100, '%');
   addSlider(pw, 'ext', '線端の伸び（太った量に対して）', 0, 100, '%');
+  addSlider(pw, 'ox', '外側へ太る割合（左右の輪郭）', 0, 100, '%');
+  addSlider(pw, 'oy', '外側へ太る割合（上下の輪郭）', 0, 100, '%');
   var pu = dlg.add('panel', undefined, '太さの均一化'); pu.alignChildren = 'fill';
   addSlider(pu, 'uni', '揃える強さ', 0, 100, '%');
   addSlider(pu, 'tol', '揃える範囲（基準からのずれ）', 5, 80, '%');
@@ -720,7 +801,7 @@ function runDialog(glyphs) {
 
   function setVal(key, v) { P[key] = v; if (sliders[key]) { sliders[key].sl.value = v; sliders[key].et.text = String(v); } }
   function params() {
-    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec, compat: cbCompat.value };
+    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, outX: P.ox / 100, outY: P.oy / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec, compat: cbCompat.value };
   }
   var dirty = false;
   function reanalyze() {
@@ -747,7 +828,8 @@ function runDialog(glyphs) {
     nUpd++; lastEnd = now(); busy = false;
     status.text = 'プレビュー更新 ' + nUpd + ' 回目 ・ ' + ((lastEnd - t0) / 1000).toFixed(1) + ' 秒 ・ 縦画 ' + P.W + '% ・ アンカー ' + n;
   }
-  dd.onChange = safe(function () { reanalyze(); refresh(); });
+  // 欧文は上下の輪郭を内側へ（x ハイト・キャップを保つ）、かなは内外に半分ずつ
+  dd.onChange = safe(function () { var oy = dd.selection.index === 1 ? 50 : 10; setVal('oy', oy); DEF.oy = oy; reanalyze(); refresh(); });
   eBase.onChange = eTop.onChange = safe(function () { reanalyze(); refresh(); });
   cbPrev.onClick = safe(refresh);
   bUpd.onClick = safe(refresh);

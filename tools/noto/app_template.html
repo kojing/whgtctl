@@ -135,13 +135,15 @@ var FONTS = /*__FONTS__*/null;
   Object.keys(FONTS.Regular).forEach(function(ch){ var c = ch.charCodeAt(0); (c < 0x3000 ? CHARS.latn : c < 0x30A0 ? CHARS.hira : CHARS.kata).push(ch); });
   function setOfChar(ch){ var c = ch.charCodeAt(0); return c < 0x3000 ? 'latn' : c < 0x30A0 ? 'hira' : 'kata'; }
 
-  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, ext:50, os:0, oc:0, prec:2 };
+  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, ext:50, ox:50, oy:50, os:0, oc:0, prec:2 };
   var SL = [
     { t:'ウェイト', items:[
       ['W','縦画の太さ（Regular の StdVW 比）',30,220,'%'],
       ['mg','カウンター保護（最小の空き）',0,80,'%'],
       ['cp','カウンター保持（字幅で吸収）',0,100,'%'],
-      ['ext','線端の伸び（太った量に対して）',0,100,'%'] ]},
+      ['ext','線端の伸び（太った量に対して）',0,100,'%'],
+      ['ox','外側へ太る割合（左右の輪郭）',0,100,'%'],
+      ['oy','外側へ太る割合（上下の輪郭）',0,100,'%'] ]},
     { t:'太さの均一化', items:[
       ['uni','揃える強さ',0,100,'%'],
       ['tol','揃える範囲（基準からのずれ）',5,80,'%'] ]},
@@ -178,7 +180,7 @@ var FONTS = /*__FONTS__*/null;
   syncSliders();
 
   function press(attr, v){ document.querySelectorAll('[data-' + attr + ']').forEach(function(b){ b.setAttribute('aria-pressed', b.getAttribute('data-' + attr) === v ? 'true' : 'false'); }); }
-  document.querySelectorAll('[data-set]').forEach(function(b){ b.addEventListener('click', function(){ state.set = b.getAttribute('data-set'); state.sel = null; press('set', state.set); ensureSet(state.set, function(){ renderAll(); }); }); });
+  document.querySelectorAll('[data-set]').forEach(function(b){ b.addEventListener('click', function(){ state.set = b.getAttribute('data-set'); state.sel = null; DEF.oy = state.set === 'latn' ? 10 : 50; P.oy = DEF.oy; syncSliders(); press('set', state.set); ensureSet(state.set, function(){ renderAll(); }); }); });
   document.querySelectorAll('[data-cmp]').forEach(function(b){ b.addEventListener('click', function(){ state.cmp = b.getAttribute('data-cmp'); press('cmp', state.cmp); document.getElementById('match').disabled = state.cmp === 'none'; renderAll(); }); });
   document.getElementById('showCmp').addEventListener('change', function(e){ state.showCmp = e.target.checked; renderAll(); });
   document.getElementById('showAnc').addEventListener('change', function(e){ state.showAnc = e.target.checked; renderInspector(); });
@@ -249,7 +251,7 @@ var FONTS = /*__FONTS__*/null;
   var rawCache = {};
   function rawContours(weight, ch){ var k = weight + ch; if (!rawCache[k]){ var sm = SETM[setOfChar(ch)]; rawCache[k] = glyphContours(FONTS[weight][ch], sm.S, sm.fm); } return rawCache[k]; }
   function inkArea(C){ return C.reduce(function(t, sg){ return t + polyArea(flattenSegs(sg, 12)); }, 0); }
-  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, ext:P.ext/100, tiny:0.35, smooth:5, os:P.os, oc:P.oc, prec:P.prec, compat:state.compat }; }
+  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, ext:P.ext/100, outX:P.ox/100, outY:P.oy/100, tiny:0.35, smooth:5, os:P.os, oc:P.oc, prec:P.prec, compat:state.compat }; }
   function sig(){ return JSON.stringify(P) + state.compat; }
   function synth(ch){
     var st = curSet(), key = sig();
