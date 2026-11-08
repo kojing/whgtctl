@@ -6,7 +6,7 @@ if (!fs.existsSync(outDir)) fs.mkdirSync(outDir);
 eval(fs.readFileSync(path.join(here, 'sample-input.js'), 'utf8') + '\n;global.INPUT=INPUT;');
 global.PointType = { SMOOTH: 'SMOOTH', CORNER: 'CORNER' };
 global.app = { redraw: function () {} };
-eval(fs.readFileSync(path.join(here, '..', 'scripts', 'OpticalCorrection.jsx'), 'utf8').replace(/^﻿/, '').replace('#target illustrator', ''));
+eval(fs.readFileSync(path.join(here, '..', 'scripts', 'OpticalCorrection.jsx'), 'utf8').replace(/^﻿/, '').replace(/^#target.*$/mg, ''));
 
 var S = 0.12, OX = 100, OY = 300;
 function toPt(p) { return [p[0] * S + OX, p[1] * S + OY]; }

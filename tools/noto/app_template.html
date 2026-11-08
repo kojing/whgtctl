@@ -67,7 +67,13 @@
         <button type="button" data-set="kata" aria-pressed="false">カタカナ</button>
         <button type="button" data-set="latn" aria-pressed="false">英数字</button>
       </div>
-      <label class="chk"><input type="checkbox" id="compat" checked>頂点数を揃える（ウェイト間で互換）</label>
+      <label class="chk" style="display:flex;gap:8px;align-items:center"><span style="white-space:nowrap">頂点数</span>
+        <select id="ptsMode" style="font:inherit;padding:2px 4px">
+          <option value="fine" selected>ウェイト間で揃える（精度優先）</option>
+          <option value="same">元と同じ</option>
+          <option value="free">揃えない（最高精度）</option>
+        </select></label>
+      <label class="chk"><input type="checkbox" id="tsnap">線端を水平・垂直に揃える</label>
     </div>
 
     <div class="sec">
@@ -135,10 +141,10 @@ var FONTS = /*__FONTS__*/null;
   Object.keys(FONTS.Regular).forEach(function(ch){ var c = ch.charCodeAt(0); (c < 0x3000 ? CHARS.latn : c < 0x30A0 ? CHARS.hira : CHARS.kata).push(ch); });
   function setOfChar(ch){ var c = ch.charCodeAt(0); return c < 0x3000 ? 'latn' : c < 0x30A0 ? 'hira' : 'kata'; }
 
-  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, ext:50, ox:50, oy:50, os:0, oc:0, prec:2 };
+  var DEF = { W:100, uni:0, tol:30, ratio:95, dg:0, mg:35, cp:0, ext:50, ox:50, oy:50, os:0, oc:0, prec:2, flare:0, flen:250, tround:0, tang:0 };
   var SL = [
     { t:'ウェイト', items:[
-      ['W','縦画の太さ（Regular の StdVW 比）',30,220,'%'],
+      ['W','縦画の太さ（Regular の StdVW 比）',10,220,'%'],
       ['mg','カウンター保護（最小の空き）',0,80,'%'],
       ['cp','カウンター保持（字幅で吸収）',0,100,'%'],
       ['ext','線端の伸び（太った量に対して）',0,100,'%'],
@@ -150,13 +156,18 @@ var FONTS = /*__FONTS__*/null;
     { t:'縦横の比率', items:[
       ['ratio','横画 / 縦画',30,130,'%'],
       ['dg','斜画を細く',0,30,'%'] ]},
+    { t:'線端（ターミナル）', items:[
+      ['flare','フレア（線端の広がり・線の太さ比）',0,100,'%'],
+      ['flen','フレアの長さ（線の太さ比）',50,600,'%'],
+      ['tround','線端の丸み',0,100,'%'],
+      ['tang','線端の角度',-45,45,'°'] ]},
     { t:'光学補正・精度', items:[
       ['os','オーバーシュート',0,30,'u'],
       ['oc','光学的中心（中央の横画）',0,40,'u'],
       ['prec','曲線の許容誤差',1,8,'u'] ]}
   ];
   var P = {}; for (var k in DEF) P[k] = DEF[k];
-  var state = { set:'hira', cmp:'Bold', showCmp:true, showAnc:true, sel:null, compat:true };
+  var state = { set:'hira', cmp:'Bold', showCmp:true, showAnc:true, sel:null, compat:true, fine:true, tsnap:false };
   var SETS = {}, CMPST = {}, busy = false;
 
   /* ---------- UI: sliders ---------- */
@@ -184,7 +195,8 @@ var FONTS = /*__FONTS__*/null;
   document.querySelectorAll('[data-cmp]').forEach(function(b){ b.addEventListener('click', function(){ state.cmp = b.getAttribute('data-cmp'); press('cmp', state.cmp); document.getElementById('match').disabled = state.cmp === 'none'; renderAll(); }); });
   document.getElementById('showCmp').addEventListener('change', function(e){ state.showCmp = e.target.checked; renderAll(); });
   document.getElementById('showAnc').addEventListener('change', function(e){ state.showAnc = e.target.checked; renderInspector(); });
-  document.getElementById('compat').addEventListener('change', function(e){ state.compat = e.target.checked; ensureSet(state.set, function(){ renderAll(); }); });
+  document.getElementById('ptsMode').addEventListener('change', function(e){ var v = e.target.value; state.compat = v !== 'free'; state.fine = v === 'fine'; ensureSet(state.set, function(){ renderAll(); }); });
+  document.getElementById('tsnap').addEventListener('change', function(e){ state.tsnap = e.target.checked; renderAll(); });
   document.getElementById('reset').addEventListener('click', function(){ for (var k in DEF) P[k] = DEF[k]; var st = curSet(); if (st && st.ST) P.ratio = Math.round(st.ST.ratio * 100); syncSliders(); renderAll(); });
   document.getElementById('match').addEventListener('click', function(){
     if (state.cmp === 'none') return;
@@ -212,7 +224,7 @@ var FONTS = /*__FONTS__*/null;
     var out = { As:{}, widths:[] };
     chunked(chars, function(ch){
       var sm = SETM[setOfChar(ch)];
-      var A = analyzeGlyph(glyphContours(FONTS[weight][ch], sm.S, sm.fm), sm.m, { compat: weight === 'Regular' && state.compat }); A.ch = ch;
+      var A = analyzeGlyph(glyphContours(FONTS[weight][ch], sm.S, sm.fm), sm.m, { compat: weight === 'Regular' && state.compat, fine: weight === 'Regular' && state.compat && state.fine }); A.ch = ch;
       out.As[ch] = A; out.widths = out.widths.concat(glyphVerticalWidths(A));
     }, function(){
       var Wm = median(out.widths) || 60;
@@ -221,7 +233,7 @@ var FONTS = /*__FONTS__*/null;
       cb(out);
     }, label);
   }
-  function setKey(set){ return set + (state.compat ? ':c' : ':n'); }
+  function setKey(set){ return set + (state.compat ? (state.fine ? ':f' : ':c') : ':n'); }
   function curSet(){ return SETS[setKey(state.set)]; }
   function ensureSet(set, cb){
     var key = setKey(set);
@@ -251,8 +263,8 @@ var FONTS = /*__FONTS__*/null;
   var rawCache = {};
   function rawContours(weight, ch){ var k = weight + ch; if (!rawCache[k]){ var sm = SETM[setOfChar(ch)]; rawCache[k] = glyphContours(FONTS[weight][ch], sm.S, sm.fm); } return rawCache[k]; }
   function inkArea(C){ return C.reduce(function(t, sg){ return t + polyArea(flattenSegs(sg, 12)); }, 0); }
-  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, ext:P.ext/100, outX:P.ox/100, outY:P.oy/100, tiny:0.35, smooth:5, os:P.os, oc:P.oc, prec:P.prec, compat:state.compat }; }
-  function sig(){ return JSON.stringify(P) + state.compat; }
+  function params(){ return { W:P.W/100, uni:P.uni/100, tol:P.tol/100, ratio:P.ratio/100, dg:P.dg/100, mg:P.mg/100, cp:P.cp/100, ext:P.ext/100, outX:P.ox/100, outY:P.oy/100, tiny:0.35, smooth:5, os:P.os, oc:P.oc, prec:P.prec, compat:state.compat, flare:P.flare/100, flen:P.flen/100, tround:P.tround/100, tang:P.tang, tsnap:state.tsnap }; }
+  function sig(){ return JSON.stringify(P) + state.compat + state.fine + state.tsnap; }
   function synth(ch){
     var st = curSet(), key = sig();
     if (st.cacheKey !== key){ st.cache = {}; st.cacheKey = key; }
