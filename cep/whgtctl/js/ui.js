@@ -1,11 +1,14 @@
 /* whgtctl CEP パネルの画面 */
 (function () {
+  var boot = document.getElementById('boot'); if (boot) boot.parentNode.removeChild(boot);
+  window.onerror = function (m, src, line) { var st = document.getElementById('status'); if (st) { st.textContent = 'エラー: ' + m + '（' + (src || '').split('/').pop() + ' ' + line + '行）'; st.className = 'err'; } };
   var SPEC = [
     { t: 'ウェイト', items: [
       ['W', '縦画の太さ（元の StdVW 比）', 10, 200, 100, '%'],
       ['mg', 'カウンター保護（最小の空き）', 0, 80, 35, '%'],
       ['cp', 'カウンター保持（字幅で吸収）', 0, 100, 0, '%'],
       ['ext', '線端の伸び（太った量に対して）', 0, 100, 50, '%'],
+      ['learn', '学習モデル（16 書体から学んだ太り方）', 0, 100, 0, '%'],
       ['ox', '外側へ太る割合（左右の輪郭）', 0, 100, 50, '%'],
       ['oy', '外側へ太る割合（上下の輪郭）', 0, 100, 10, '%'] ] },
     { t: '太さの均一化', items: [
@@ -60,12 +63,12 @@
 
   function opts() {
     var pm = $('pts').value;
-    return { script: $('script').value, base: parseFloat($('base').value), top: parseFloat($('top').value), compat: pm !== 'free', fine: pm === 'fine' };
+    return { script: $('script').value, base: parseFloat($('base').value), top: parseFloat($('top').value), compat: pm !== 'free', fine: pm === 'fine' || pm === 'opt', simp: pm === 'opt' };
   }
   function params() {
     var o = opts();
-    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100,
-      outX: P.ox / 100, outY: P.oy / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec, compat: o.compat, fine: o.fine, lockM: $('cbLock').checked,
+    return { W: P.W / 100, uni: P.uni / 100, tol: P.tol / 100, ratio: P.ratio / 100, dg: P.dg / 100, mg: P.mg / 100, cp: P.cp / 100, ext: P.ext / 100, learn: P.learn / 100,
+      outX: P.ox / 100, outY: P.oy / 100, tiny: 0.35, smooth: 5, os: P.os, oc: P.oc, prec: P.prec, compat: o.compat, fine: o.fine, simp: o.simp, lockM: $('cbLock').checked,
       flare: P.flare / 100, flen: P.flen / 100, tround: P.tround / 100, tang: P.tang, tsnap: $('cbSnap').checked };
   }
   function setBusy(b) { busy = b; $('bLoad').disabled = $('bApply').disabled = $('bCancel').disabled = b; }
@@ -130,7 +133,7 @@
     if ($('cbPrev').checked) preview();
     else if (loaded) host('wctlhUnpreview()', function () { status('プレビュー：オフ（適用すると現在の値で変形します）'); });
   });
-  $('script').addEventListener('change', function () { setVal('oy', $('script').value === 'kana' ? 50 : 10); DEF.oy = P.oy; schedule(); });
+  $('script').addEventListener('change', function () { var o = SCRIPT_OUT[$('script').value]; setVal('ox', o[0]); setVal('oy', o[1]); DEF.ox = o[0]; DEF.oy = o[1]; schedule(); });
   ['base', 'top'].forEach(function (id) { $(id).addEventListener('change', schedule); });
   ['pts', 'cbLock', 'cbSnap'].forEach(function (id) { $(id).addEventListener('change', schedule); });
   $('bReset').addEventListener('click', function () { for (var k in DEF) setVal(k, DEF[k]); schedule(); });

@@ -27,6 +27,7 @@
 </style>
 </head>
 <body>
+  <div id="boot" style="color:#ffd27f;margin-bottom:6px">パネルの画面を読み込みました（この行が消えない場合は、スクリプトの読み込みに失敗しています）</div>
   <div class="btns">
     <button id="bLoad" class="primary">選択を読み込む</button>
     <button id="bApply">適用（確定）</button>
@@ -38,10 +39,10 @@
 
   <h2>書体とメトリクス（ドキュメント座標・pt）</h2>
   <div class="grid2">
-    <span>書体</span><select id="script"><option value="latin">欧文</option><option value="kana">かな</option></select>
+    <span>書体</span><select id="script"><option value="latin">欧文</option><option value="kana">かな（ひらがな・カタカナ）</option><option value="symj">和文記号</option><option value="syml">欧文記号</option></select>
     <span>ベースライン</span><input type="text" id="base" size="8">
     <span>上端</span><input type="text" id="top" size="8">
-    <span>頂点数</span><select id="pts"><option value="fine">ウェイト間で揃える（精度優先）</option><option value="same">元と同じ</option><option value="free">揃えない（最高精度）</option></select>
+    <span>頂点数</span><select id="pts"><option value="opt">ウェイト間で揃える＋区間を整理</option><option value="fine">ウェイト間で揃える（元の区間）</option><option value="same">元と同じ</option><option value="free">揃えない（最高精度）</option></select>
   </div>
   <div class="chk"><input type="checkbox" id="cbLock"><label for="cbLock">ベースラインと上端に乗る水平の辺を動かさない</label></div>
 

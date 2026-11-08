@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="7.0" ExtensionBundleId="net.kojing.hello" ExtensionBundleVersion="1.0.0" ExtensionBundleName="hello" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <ExtensionList><Extension Id="net.kojing.hello.panel" Version="1.0.0"/></ExtensionList>
+  <ExecutionEnvironment>
+    <HostList><Host Name="ILST" Version="[22.0,99.9]"/></HostList>
+    <LocaleList><Locale Code="All"/></LocaleList>
+    <RequiredRuntimeList><RequiredRuntime Name="CSXS" Version="9.0"/></RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="net.kojing.hello.panel">
+      <DispatchInfo>
+        <Resources><MainPath>./index.html</MainPath></Resources>
+        <Lifecycle><AutoVisible>true</AutoVisible></Lifecycle>
+        <UI><Type>Panel</Type><Menu>CEP test</Menu><Geometry><Size><Height>200</Height><Width>300</Width></Size></Geometry></UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>

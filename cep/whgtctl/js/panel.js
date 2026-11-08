@@ -40,14 +40,14 @@ WctlCore.prototype.analyze = function (o) {
   if (!glyphs.length) throw new Error('塗りのある閉じたパスが見つかりませんでした');
   var met = (o.base === undefined || isNaN(o.base)) ? (this.met || detectMetrics(glyphs)) : { base: o.base, top: o.top };
   this.met = met;
-  this.job = analyzeJob(glyphs, met, o.script, o.compat, o.fine);
+  this.job = analyzeJob(glyphs, met, o.script, o.compat, o.fine, o.simp);
   this.job.met = met;
   this.key = this.keyOf(o);
   return this.job;
 };
 WctlCore.prototype.keyOf = function (o) {
   var m = (o.base === undefined || isNaN(o.base)) ? this.met : o;
-  return [o.script, m ? Number(m.base).toFixed(2) : '', m ? Number(m.top).toFixed(2) : '', o.compat ? 1 : 0, o.fine ? 1 : 0].join('|');
+  return [o.script, m ? Number(m.base).toFixed(2) : '', m ? Number(m.top).toFixed(2) : '', o.compat ? 1 : 0, o.fine ? 1 : 0, o.simp ? 1 : 0].join('|');
 };
 WctlCore.prototype.deform = function (o, p) {
   if (!this.job || this.key !== this.keyOf(o)) this.analyze(o);

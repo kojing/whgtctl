@@ -3,3 +3,5 @@ tests/out/
 tools/noto/*.otf
 tools/noto/kana.json
 tools/noto/latin.json
+tools/noto/symj.json
+tools/noto/syml.json

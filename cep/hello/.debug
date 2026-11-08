@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList><Extension Id="net.kojing.hello.panel"><HostList><Host Name="ILST" Port="8089"/></HostList></Extension></ExtensionList>
