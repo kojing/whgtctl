@@ -296,8 +296,23 @@ function smoothstepCos(d, R) { return d >= R ? 0 : (1 + Math.cos(Math.PI * d / R
 /* ====================================================================== */
 /* 解析（座標は「メトリクス高さ = 700u」に正規化済み、y 上向き）            */
 /* ====================================================================== */
-var ENG = { GRID: true, SNAPMAX: 30, TCLIM: 2.5, RAMP: false, TINYCORNER: true, LINVAR: false, BETWEEN: true, MLT: 2, STEP: 9, FLAT: 10, SAMP: 12, BALL: false, TENS: 0.5, FREE: true, FREEDEG: 60, CSPLIT: 0 };
+var ENG = { PAIRCAP: true, SKEL: false, SKELDOT: 0.5, GRID: true, SNAPMAX: 30, TCLIM: 2.5, RAMP: false, TINYCORNER: true, LINVAR: false, BETWEEN: true, MLT: 2, STEP: 9, FLAT: 10, SAMP: 12, BALL: false, TENS: 0.5, FREE: true, FREEDEG: 60, CSPLIT: 0 };
 // 内接円（shrinking ball）：p で輪郭に接し、内側に向かって他の輪郭点に触れるまで膨らませた円の直径＝その点での画の太さ
+// 骨格（中心線）からの太さ：その点で輪郭に接する最大の内接円を求め、反対側の輪郭（向きがほぼ逆）に接していれば直径を太さとする。
+// 角や線端の近くで同じ側の輪郭に接する円は、画の太さではないので使わない（null を返す）
+function skelWidth(pts, px, py, nx, ny, cap) {
+  var r = cap / 2, j = -1, r2x4 = 4 * r * r;
+  for (var i = 0; i < pts.length; i++) {
+    var q = pts[i], dx = q[0] - px, dy = q[1] - py, dn = dx * nx + dy * ny;
+    if (dn <= 1e-3) continue;
+    var d2 = dx * dx + dy * dy;
+    if (d2 < 4 || d2 > r2x4) continue;
+    var rr = d2 / (2 * dn); if (rr < r) { r = rr; j = i; r2x4 = 4 * r * r; }
+  }
+  if (j < 0) return null;
+  var q2 = pts[j], c = q2[2] * nx + q2[3] * ny;
+  return c < -ENG.SKELDOT ? 2 * r : null;
+}
 function ballWidth(pts, px, py, nx, ny, cap) {
   var r = cap / 2;
   for (var i = 0; i < pts.length; i++) {
@@ -351,9 +366,15 @@ function analyzeGlyph(contours, m, opts) {
   edges.grid = ENG.GRID ? buildEdgeGrid(edges) : null;
   // 内接円用の輪郭点（細かめに）
   var bpts = [];
-  if (ENG.BALL) C.forEach(function (segs) { segs.forEach(function (g) {
+  if (ENG.BALL || ENG.SKEL) C.forEach(function (segs) { segs.forEach(function (g) {
     var L = g.line ? hyp(g.b[0] - g.a[0], g.b[1] - g.a[1]) : hyp(g.c1[0] - g.a[0], g.c1[1] - g.a[1]) + hyp(g.c2[0] - g.c1[0], g.c2[1] - g.c1[1]) + hyp(g.b[0] - g.c2[0], g.b[1] - g.c2[1]);
-    var k = Math.max(2, Math.ceil(L / 4)); for (var j = 0; j < k; j++) bpts.push(bez(g, j / k));
+    var k = Math.max(2, Math.ceil(L / 4));
+    for (var j = 0; j < k; j++) {
+      var P = bez(g, j / k), T = segTan(g, j / k), nx0 = -T[1], ny0 = T[0];
+      // 見えている輪郭だけ（重なった塗りの、別の形に隠れた辺は太さの測定に使わない）
+      if (ENG.SKEL && !(windingAt(flat, P[0] + nx0, P[1] + ny0) !== 0 && windingAt(flat, P[0] - nx0, P[1] - ny0) === 0)) continue;
+      bpts.push([P[0], P[1], nx0, ny0]);
+    }
   }); });
   var SEG = C.map(function (segs, ci) {
     return segs.map(function (g, si) {
@@ -366,6 +387,7 @@ function analyzeGlyph(contours, m, opts) {
         if (s.vis) {
           s.wr = rayExit(flat, edges, s.x + s.nx * 0.75, s.y + s.ny * 0.75, s.nx, s.ny) + 0.75;
           s.w = ENG.BALL ? Math.min(s.wr, ballWidth(bpts, s.x, s.y, s.nx, s.ny, s.wr)) : s.wr;
+          if (ENG.SKEL) { s.wb = skelWidth(bpts, s.x, s.y, s.nx, s.ny, s.wr); if (s.wb !== null && s.wb < s.w) s.w = s.wb; }
           s.gap = rayEnter(flat, edges, s.x - s.nx * 0.75, s.y - s.ny * 0.75, -s.nx, -s.ny) + 0.75;
           // 反対側の輪郭のさらに外：文字の外側か、別の画との間（カウンター）か
           s.gapOpp = rayEnter(flat, edges, s.x + s.nx * (s.wr + 0.75), s.y + s.ny * (s.wr + 0.75), s.nx, s.ny) + 0.75;
@@ -799,6 +821,30 @@ function deformGlyph(A, ST, p) {
   };
   var hshift = function (x) { return x > A.cx + 1 ? dxw : (x < A.cx - 1 ? -dxw : 0); };
   var post = function (pt, ci) { return [pt[0] + hshift(pt[0]), pt[1] + vshift(pt[0], pt[1], ci)]; };
+  // 向かい合う直線どうしで、両側のずらす量の合計が「太さ − 目標の太さ」を超えないように抑える（細くしすぎて画がつぶれる・裏返るのを防ぐ）
+  if (ENG.PAIRCAP) {
+    var allS = []; A.SEG.forEach(function (segs, ci) { segs.forEach(function (S, si) { allS.push(S); }); });
+    allS.forEach(function (S) {
+      if (!S.g.line || S.hidden || S.isCap || S.coincide) return;
+      var mx = (S.g.a[0] + S.g.b[0]) / 2, my = (S.g.a[1] + S.g.b[1]) / 2, best = null;
+      allS.forEach(function (O) {
+        if (O === S || !O.g.line || O.hidden || O.isCap || O.coincide) return;
+        if (O.n0[0] * S.n0[0] + O.n0[1] * S.n0[1] > -0.9) return;        // ほぼ逆向きの辺だけ
+        var ex = O.g.b[0] - O.g.a[0], ey = O.g.b[1] - O.g.a[1], den = S.n0[0] * ey - S.n0[1] * ex; if (Math.abs(den) < 1e-9) return;
+        var ax = O.g.a[0] - mx, ay = O.g.a[1] - my, t = (ax * ey - ay * ex) / den, u = (ax * S.n0[1] - ay * S.n0[0]) / den;
+        if (t > 0 && u >= 0 && u <= 1 && t < 1.8 * ST.V && (!best || t < best.t)) best = { O: O, t: t };
+      });
+      if (!best) return;
+      var dS = DF[S.ci][S.si], dO = DF[best.O.ci][best.O.si], vS = (dS(0) + dS(1)) / 2, vO = (dO(0) + dO(1)) / 2;
+      var room = best.t - targetFor(best.t, S.n0[0], S.n0[1], M, p);
+      var tg0 = targetFor(best.t, S.n0[0], S.n0[1], M, p);
+      if (vS > 0 && vO > 0 && vS + vO > room + 0.5 * tg0 && room > 0) {       // 目標の半分より細くなる（つぶれる）ときだけ
+        var f = room / (vS + vO);
+        DF[S.ci][S.si] = (function (F, f) { return function (t) { return F(t) * f; }; })(dS, f);
+        DF[best.O.ci][best.O.si] = (function (F, f) { return function (t) { return F(t) * f; }; })(dO, f);
+      }
+    });
+  }
   // フレア：線端に近いほど太らせる（ずらす量から引く）。線端からの距離は輪郭に沿って測る
   if (p.flare > 0) A.SEG.forEach(function (segs, ci) {
     var n = segs.length, len = [], pos = [], T = 0, caps = [];

@@ -45,7 +45,7 @@ while ((m = re.exec(src))) ds.push(m[1]);
 var items = ds.map(function (d) { var subs = parseD(d).map(function (s) { return new PathItem(s); }); return subs.length > 1 ? { typename: 'CompoundPathItem', pathItems: subs } : subs[0]; });
 var sel = process.argv[5] === 'group' ? items.map(function (it, k) { return { typename: 'GroupItem', name: 'g' + k, pageItems: [it], clipped: false }; }) : items;
 var glyphs = buildJob(sel), met = detectMetrics(glyphs);
-var opt = JSON.parse(process.argv[4] || '{}'); if (opt.BALL) ENG.BALL = true; if (opt.FREE) ENG.FREE = true; if (opt.MLT) ENG.MLT = opt.MLT; if (opt.GRID === false) ENG.GRID = false; if (opt.TCLIM) ENG.TCLIM = opt.TCLIM; if (opt.RAMP !== undefined) ENG.RAMP = !!opt.RAMP; if (opt.FD) ENG.FREEDEG = opt.FD; if (opt.TENS !== undefined) ENG.TENS = opt.TENS;
+var opt = JSON.parse(process.argv[4] || '{}'); if (opt.BALL) ENG.BALL = true; if (opt.FREE) ENG.FREE = true; if (opt.MLT) ENG.MLT = opt.MLT; if (opt.GRID === false) ENG.GRID = false; if (opt.SKEL) ENG.SKEL = true; if (opt.SKELDOT) ENG.SKELDOT = opt.SKELDOT; if (opt.TCLIM) ENG.TCLIM = opt.TCLIM; if (opt.RAMP !== undefined) ENG.RAMP = !!opt.RAMP; if (opt.FD) ENG.FREEDEG = opt.FD; if (opt.TENS !== undefined) ENG.TENS = opt.TENS;
 var job = analyzeJob(glyphs, met, opt.script || 'latin', opt.compat !== false, opt.fine);
 var P = { W: 1, uni: 0, tol: 0.3, ratio: job.ST.ratio, dg: 0, mg: 0.35, cp: 0, ext: 0.5, outX: 0.5, outY: 0.1, tiny: 0.35, smooth: 5, os: 0, oc: 0, prec: 2, compat: true, lockM: glyphs.length >= 5 };
 for (var k in opt) P[k] = opt[k];
